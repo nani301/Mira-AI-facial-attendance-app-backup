@@ -1,0 +1,7 @@
+{
+  "name": "Mira Attendance: AI Facial Attendance System",
+  "description": "A production-ready facial attendance management web app for colleges. Features PIN-based identity, blink liveness detection, QR code desktop login, advanced reports, syllabus tracking, leave/bonafide applications, SBTET results, timetables, and dark/light modes. Built with React and Tailwind CSS.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
