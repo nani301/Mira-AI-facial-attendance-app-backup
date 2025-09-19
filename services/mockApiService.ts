@@ -168,234 +168,138 @@ users.filter(u => u.role === Role.FACULTY).forEach(faculty => {
 
 const syllabusData: Syllabus[] = [
     { id: 'syl_cs_01', branch: 'CS', subject: 'Data Structures', file_url: '#', percent_completed: 90, uploaded_by: 'fac_01', uploaded_by_name: 'Vidya Sagar', uploaded_at: '2023-10-21T10:00:00Z' },
-    { id: 'syl_it_01', branch: 'IT', subject: 'Web Technologies', file_url: '#', percent_completed: 75, uploaded_by: 'fac_04', uploaded_by_name: 'Uma Shankar', uploaded_at: '2023-10-20T14:00:00Z' },
-    { id: 'syl_ec_01', branch: 'EC', subject: 'Analog Circuits', file_url: '#', percent_completed: 80, uploaded_by: 'fac_02', uploaded_by_name: 'T. Manjula', uploaded_at: '2023-10-22T11:00:00Z' },
-    { id: 'syl_ec_02', branch: 'EC', subject: 'Microprocessors', file_url: '#', percent_completed: 65, uploaded_by: 'fac_02', uploaded_by_name: 'T. Manjula', uploaded_at: '2023-10-23T12:00:00Z' },
+    { id: 'syl_it_01', branch: 'IT', subject: 'Web Technologies', file_url: '#', percent_completed: 75, uploaded_by: 'fac_04', uploaded_by_name: 'Uma Shankar', uploaded_at: '2023-10-20T14:30:00Z' },
 ];
 
 let applications: Application[] = [
-    { id: 'app_01', user_id: users.find(u => u.pin === '23210-EC-053')!.id, pin: '23210-EC-053', type: ApplicationType.LEAVE, status: ApplicationStatus.APPROVED, payload: { reason: 'Family function' }, created_at: '2023-10-08T09:00:00Z' },
-    { id: 'app_02', user_id: users.find(u => u.pin === '23210-EC-053')!.id, pin: '23210-EC-053', type: ApplicationType.BONAFIDE, status: ApplicationStatus.REJECTED, payload: { reason: 'Bus Pass Application' }, created_at: '2023-10-15T11:00:00Z' },
+    { id: 'app_01', user_id: users.find(u => u.pin === '23210-EC-004')?.id || '', pin: '23210-EC-004', type: ApplicationType.LEAVE, status: ApplicationStatus.PENDING, payload: { reason: 'Family function', from_date: '2023-11-05', to_date: '2023-11-06'}, created_at: '2023-11-01T09:00:00Z' },
+    { id: 'app_02', user_id: users.find(u => u.pin === '23210-EC-010')?.id || '', pin: '23210-EC-010', type: ApplicationType.BONAFIDE, status: ApplicationStatus.APPROVED, payload: { reason: 'Passport application' }, created_at: '2023-10-28T11:00:00Z', decided_at: '2023-10-29T15:00:00Z' },
 ];
 
-const results: Result[] = [];
-users.filter(u => u.role === Role.STUDENT).forEach(u => {
-    results.push({
-        id: `res_${u.id}`, pin: u.pin, userName: u.name, branch: u.branch, semester: 3,
-        sgpa: parseFloat((Math.random() * (9.8 - 7.5) + 7.5).toFixed(2)),
-        backlogs: Math.random() > 0.9 ? 1 : 0
-    });
-});
+const resultsData: Result[] = [];
+const timetables: Timetable[] = [];
+const feedback: Feedback[] = [];
 
-const timetables: Timetable[] = [
-    { id: 'tt_ec', branch: 'EC', file_url: 'https://i.imgur.com/example-timetable.png', effective_from: '2023-10-01T00:00:00Z', uploaded_by: 'fac_02' },
-];
+// --- API SIMULATION ---
+const simulateDelay = <T>(data: T, delay = 300): Promise<T> => new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
 
-const feedbacks: Feedback[] = [];
+// --- AUTH ---
+let authenticatedUserId = 'fac_01';
+export const getAuthenticatedUser = () => simulateDelay(users.find(u => u.id === authenticatedUserId));
+export const setAuthenticatedUser = (userId: string) => {
+    authenticatedUserId = userId;
+    return simulateDelay(users.find(u => u.id === userId));
+}
+export const getAllFaculty = () => simulateDelay(users.filter(u => u.role === Role.FACULTY));
 
-// --- API FUNCTIONS ---
-
-// This variable will hold the ID of the currently "logged in" faculty member.
-let currentAuthenticatedUserId = 'princ_01'; // Default to Principal to test admin features
-
-const simulateDelay = <T,>(data: T, ms=300): Promise<T> => {
-    return new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), ms));
-};
-
-export const getAllFaculty = (): Promise<User[]> => {
-    // Now includes Principal
-    return simulateDelay(users.filter(u => u.role === Role.FACULTY || u.role === Role.PRINCIPAL));
-};
-
-export const setAuthenticatedUser = (userId: string): Promise<User> => {
-    const user = users.find(u => u.id === userId);
-    if (!user) {
-        throw new Error("User not found");
-    }
-    currentAuthenticatedUserId = userId;
-    return simulateDelay(user);
-};
-
-export const getAuthenticatedUser = (): Promise<User> => {
-    const user = users.find(u => u.id === currentAuthenticatedUserId);
-    if (!user) {
-        // Fallback
-        return simulateDelay(users.find(u => u.role === Role.PRINCIPAL)!);
-    }
-    return simulateDelay(user);
-};
-
-export const getUsers = (): Promise<User[]> => {
-    return simulateDelay(users);
-};
-
-export const addUser = async (user: Omit<User, 'id'>): Promise<User> => {
-    const newUser: User = { ...user, id: `usr_${Date.now()}` };
-    users = [newUser, ...users];
-    return simulateDelay(newUser);
-};
-
-export const updateUser = async (userId: string, updates: Partial<User>): Promise<User> => {
-    let updatedUser: User | null = null;
-    users = users.map(u => {
-        if (u.id === userId) {
-            updatedUser = { ...u, ...updates };
-            return updatedUser;
-        }
-        return u;
-    });
-    if (updatedUser) {
-        return simulateDelay(updatedUser);
-    }
-    throw new Error('User not found');
-};
-
-export const deleteUser = async (userId: string): Promise<{ success: boolean }> => {
-    const initialLength = users.length;
-    users = users.filter(u => u.id !== userId);
-    return simulateDelay({ success: users.length < initialLength });
-};
-
-
-export const getUsersByBranch = (branch: string): Promise<User[]> => {
-    return simulateDelay(users.filter(u => u.branch === branch && u.role === Role.STUDENT));
-};
-
-export const getAttendanceRecords = (): Promise<AttendanceRecord[]> => {
-    return simulateDelay(attendanceRecords);
-};
-
-export const getAttendanceByDateAndBranch = (date: string, branch: string): Promise<AttendanceRecord[]> => {
-    // Special case for faculty view
-    if (branch === 'FACULTY') {
-        const facultyUserIds = new Set(users.filter(u => u.role === Role.FACULTY || u.role === Role.PRINCIPAL).map(u => u.id));
-        return simulateDelay(attendanceRecords.filter(r => r.date === date && facultyUserIds.has(r.userId)));
-    }
-    return simulateDelay(attendanceRecords.filter(r => r.date === date && users.find(u => u.id === r.userId)?.branch === branch));
-};
-
-export const getSyllabusByBranch = (branch: string): Promise<Syllabus[]> => {
-    return simulateDelay(syllabusData.filter(s => s.branch === branch));
-};
-
-export const getDashboardStats = (todayDate: string): Promise<{ present: number; absent: number; total: number }> => {
-    const todayRecords = attendanceRecords.filter(r => r.date === todayDate);
-    const present = todayRecords.filter(r => r.status === AttendanceStatus.PRESENT || r.status === AttendanceStatus.LATE).length;
+// --- DASHBOARD ---
+export const getDashboardStats = (date: string) => {
+    const dailyRecords = attendanceRecords.filter(r => r.date === date && r.userPin.startsWith('23')); // Only students
     const totalStudents = users.filter(u => u.role === Role.STUDENT).length;
-    return simulateDelay({ present, absent: totalStudents - present, total: totalStudents });
+    return simulateDelay({
+        present: dailyRecords.length,
+        absent: totalStudents - dailyRecords.length,
+        total: totalStudents,
+    });
 };
 
-export const getApplicationsByUserId = (userId: string): Promise<Application[]> => {
-    return simulateDelay(applications.filter(a => a.user_id === userId));
+// --- REPORTS ---
+export const getAttendanceByDateAndBranch = (date: string, branch: string) => {
+    const isFaculty = branch === 'FACULTY';
+    const records = attendanceRecords.filter(r => {
+        if (r.date !== date) return false;
+        const user = users.find(u => u.id === r.userId);
+        if (!user) return false;
+        if (isFaculty) return user.role === Role.FACULTY || user.role === Role.PRINCIPAL;
+        return user.branch === branch;
+    });
+    return simulateDelay(records);
 }
-export const getResultsByBranch = (branch: string): Promise<Result[]> => {
-    return simulateDelay(results.filter(r => r.branch === branch));
+
+// --- ATTENDANCE LOG ---
+export const getUserByDetails = ({ year, collegeCode, branch, roll }: { year: number, collegeCode: string, branch: string, roll: string}) => {
+    const pin = `${year}${collegeCode}-${branch}-${roll.padStart(3, '0')}`;
+    return simulateDelay(users.find(u => u.pin === pin));
+};
+
+export const markAttendance = (userId: string, coords: {lat: number, lng: number}) => {
+    const date = formatDate(new Date());
+    const existing = attendanceRecords.find(r => r.userId === userId && r.date === date);
+    const user = users.find(u => u.id === userId);
+    if (existing || !user) return simulateDelay({ success: false });
+
+    attendanceRecords.unshift({
+        id: `att_${userId}_${date}`,
+        userId, userName: user.name, userPin: user.pin, date,
+        checkInTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        checkOutTime: null, status: AttendanceStatus.PRESENT,
+        coordinate: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+    });
+    return simulateDelay({ success: true });
+};
+
+export const sendEmail = (payload: {to: string, cc?: string, subject: string}) => {
+    console.log("Simulating email send:", payload);
+    return simulateDelay({ success: true });
+};
+export const getAttendanceByUserId = (userId: string) => {
+    return simulateDelay(attendanceRecords.filter(r => r.userId === userId));
 }
-export const getTimetableByBranch = (branch: string): Promise<Timetable | null> => {
-    return simulateDelay(timetables.find(t => t.branch === branch) || null);
+
+// --- MANAGE USERS ---
+export const getUsers = () => simulateDelay(users);
+export const addUser = (user: User) => {
+    users.push(user);
+    return simulateDelay(user);
 }
-export const submitFeedback = async (feedback: Feedback): Promise<{success: boolean}> => {
-    feedbacks.push({ ...feedback, id: `fb_${Date.now()}` });
+export const updateUser = (userId: string, updates: Partial<User>) => {
+    let user = users.find(u => u.id === userId);
+    if(user) {
+        Object.assign(user, updates);
+    }
+    return simulateDelay(user);
+}
+export const deleteUser = (userId: string) => {
+    users = users.filter(u => u.id !== userId);
     return simulateDelay({ success: true });
 }
 
-export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
+// --- SETTINGS ---
+export const sendOtp = (email: string) => {
+    console.log(`Sending OTP to ${email}. (Simulated)`);
+    return simulateDelay({ success: true, otp: "123456" }); // For demo
+}
+export const verifyOtp = (email: string, otp: string) => {
+    return simulateDelay({ success: otp === "123456" });
+}
+export const updateUserProfile = (userId: string, updates: Partial<User>) => {
     return updateUser(userId, updates);
-};
+}
 
-export const sendOtp = async (email: string): Promise<{ success: boolean }> => {
-    console.log(`Sending OTP to ${email}... (mock)`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
-};
-
-export const verifyOtp = async (email: string, otp: string): Promise<{ success: boolean }> => {
-    console.log(`Verifying OTP ${otp} for ${email}... (mock)`);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const isValid = /^\d{6}$/.test(otp);
-    return { success: isValid };
-};
-
-// --- NEW FUNCTIONS FOR REDESIGNED ATTENDANCE FLOW ---
-
-export const getUserByDetails = (details: { year: number; collegeCode: string; branch: string; roll: string }): Promise<User | null> => {
-    const { year, collegeCode, branch, roll } = details;
-    if (!year || !collegeCode || !branch || !roll) return simulateDelay(null);
-
-    const user = users.find(u =>
-        u.role === Role.STUDENT &&
-        u.year === year &&
-        u.college_code === collegeCode &&
-        u.branch.toUpperCase() === branch.toUpperCase() &&
-        u.pin.endsWith(`-${roll}`)
-    );
-
-    return simulateDelay(user || null, 250);
-};
-
-export const getUserByPin = (pin: string): Promise<User | null> => {
-    // Now also handles non-student PINs
-    const user = users.find(u => u.pin.toUpperCase() === pin.toUpperCase());
-    return simulateDelay(user || null);
-};
-
-export const getAttendanceByUserId = (userId: string): Promise<AttendanceRecord[]> => {
-    return simulateDelay(attendanceRecords.filter(r => r.userId === userId));
-};
-
-export const markAttendance = (userId: string, coords?: { lat: number, lng: number }): Promise<AttendanceRecord> => {
-    const user = users.find(u => u.id === userId);
-    if (!user) {
-        throw new Error("User not found for attendance marking");
-    }
-    const today = new Date();
-    const dateStr = formatDate(today);
-
-    // Prevent re-marking attendance
-    const existingRecord = attendanceRecords.find(r => r.userId === userId && r.date === dateStr);
-    if (existingRecord) {
-        console.log("Attendance already marked for today.");
-        return simulateDelay(existingRecord);
-    }
-    
-    const newRecord: AttendanceRecord = {
-        id: `att_${userId}_${dateStr}`,
-        userId: userId,
-        userName: user.name,
-        userPin: user.pin,
-        date: dateStr,
-        checkInTime: today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        checkOutTime: null,
-        status: AttendanceStatus.PRESENT,
-        coordinate: coords ? `${coords.lat.toFixed(6)}°N ${coords.lng.toFixed(6)}°E` : "geoperms_denied",
-        emailSent: false, // Will be set to true by the email service
-    };
-    attendanceRecords.unshift(newRecord);
-    return simulateDelay(newRecord);
-};
-
-export const sendEmail = (payload: {to: string, cc?: string, subject: string}): Promise<{ queued: boolean }> => {
-    console.log("Mock Email Sent:", payload);
-    return simulateDelay({ queued: true });
-};
-
-
-// --- NEW FUNCTIONS FOR APPLICATIONS ---
-export const submitApplication = async (appData: Omit<Application, 'id' | 'created_at' | 'status' | 'user_id'>): Promise<Application> => {
-    const user = await getUserByPin(appData.pin);
-    if (!user) throw new Error("User not found for this PIN");
-
-    const newApp: Application = {
-        ...appData,
+// --- APPLICATIONS ---
+export const submitApplication = (appData: {pin: string, type: ApplicationType, payload: any}): Promise<Application> => {
+     const user = users.find(u => u.pin === appData.pin);
+     if (!user) {
+         return Promise.reject(new Error("User with that PIN not found."));
+     }
+     const newApp: Application = {
         id: `app_${Date.now()}`,
         user_id: user.id,
-        created_at: new Date().toISOString(),
+        pin: appData.pin,
+        type: appData.type,
         status: ApplicationStatus.PENDING,
-    };
-    applications.unshift(newApp);
-    return simulateDelay(newApp, 500);
+        payload: appData.payload,
+        created_at: new Date().toISOString(),
+     };
+     applications.unshift(newApp);
+     return simulateDelay(newApp);
 };
-
-export const getApplicationsByPin = (pin: string): Promise<Application[]> => {
-    return simulateDelay(applications.filter(a => a.pin.toUpperCase() === pin.toUpperCase()));
+export const getApplicationsByPin = (pin: string) => {
+    return simulateDelay(applications.filter(a => a.pin === pin));
+};
+export const getApplicationsByUserId = (userId: string) => {
+    return simulateDelay(applications.filter(a => a.user_id === userId));
+};
+export const getUserByPin = (pin: string) => {
+    return simulateDelay(users.find(u => u.pin === pin) || null);
 };

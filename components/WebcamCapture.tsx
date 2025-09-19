@@ -1,15 +1,14 @@
-
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { XCircleIcon } from './Icons';
 
-type CaptureState = 'AWAITING_CAMERA' | 'STREAMING' | 'NO_CAMERA';
+export type CaptureState = 'AWAITING_CAMERA' | 'STREAMING' | 'NO_CAMERA';
 
 interface WebcamCaptureProps {
     isCameraOpen: boolean;
+    onCameraStateChange?: (state: CaptureState, error?: string | null) => void;
 }
 
-const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen }) => {
+const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen, onCameraStateChange }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const [captureState, setCaptureState] = useState<CaptureState>('AWAITING_CAMERA');
@@ -26,18 +25,27 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen }) => {
                     videoRef.current.srcObject = stream;
                     videoRef.current.onloadedmetadata = () => {
                         setCaptureState('STREAMING');
+                        onCameraStateChange?.('STREAMING');
                     };
                 }
             } catch (err: any) {
                 console.error("Error accessing webcam:", err);
-                setCameraError(err.message || 'Could not access the camera.');
+                const errorMessage = err.name === 'NotAllowedError'
+                    ? 'Camera permission denied. Please allow camera access in your browser settings.'
+                    : err.name === 'NotFoundError'
+                    ? 'No camera found. Please ensure a camera is connected and enabled.'
+                    : err.message || 'Could not access the camera.';
+                setCameraError(errorMessage);
                 setCaptureState('NO_CAMERA');
+                onCameraStateChange?.('NO_CAMERA', errorMessage);
             }
         } else {
-             setCameraError('Your browser does not support camera access.');
+             const errorMessage = 'Your browser does not support camera access.';
+             setCameraError(errorMessage);
              setCaptureState('NO_CAMERA');
+             onCameraStateChange?.('NO_CAMERA', errorMessage);
         }
-    }, []);
+    }, [onCameraStateChange]);
     
     const stopCamera = useCallback(() => {
         if (streamRef.current) {

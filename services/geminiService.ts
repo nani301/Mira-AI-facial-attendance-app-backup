@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AttendanceRecord, PptContent, QuizContent } from '../types';
 

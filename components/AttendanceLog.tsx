@@ -1,10 +1,10 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { User, AttendanceRecord } from '../types';
 import { getUserByDetails, markAttendance, sendEmail, getAttendanceByUserId } from '../services/mockApiService';
 import WebcamCapture from './WebcamCapture';
+import type { CaptureState } from './WebcamCapture';
 import { useModel } from '../services/modelService';
 import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, MailIcon, CalendarIcon, LocationIcon } from './Icons';
 
@@ -122,6 +122,26 @@ const AttendanceLog: React.FC = () => {
     const [lastAttendance, setLastAttendance] = useState<{ coords: { latitude: number; longitude: number }; timestamp: Date } | null>(null);
     const [pinSelectorKey, setPinSelectorKey] = useState(Date.now());
     const model = useModel();
+    const [cameraStatus, setCameraStatus] = useState<CaptureState>('AWAITING_CAMERA');
+    const [hasCameraDevice, setHasCameraDevice] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const checkForCamera = async () => {
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const hasVideo = devices.some(device => device.kind === 'videoinput');
+                    setHasCameraDevice(hasVideo);
+                } catch (err) {
+                    console.error("Could not enumerate devices:", err);
+                    setHasCameraDevice(false);
+                }
+            } else {
+                setHasCameraDevice(false);
+            }
+        };
+        checkForCamera();
+    }, []);
 
     const handleUserFound = (user: User | null) => {
         setValidatedUser(user);
@@ -130,13 +150,11 @@ const AttendanceLog: React.FC = () => {
     const onCaptureSuccess = useCallback(async () => {
         if (!validatedUser) return;
         
-        // Use simulated coordinates
         const simulatedCoords = generateRandomCoordsInRadius(COLLEGE_CENTER_LAT, COLLEGE_CENTER_LNG, CAMPUS_RADIUS_METERS);
         
-        // Adjust timestamp
         const now = new Date();
-        const adjustedTimestamp = new Date(now.getTime() + (6 * 60 * 60 * 1000) + 1000); // Add 6 hours 1 sec
-        adjustedTimestamp.setFullYear(adjustedTimestamp.getFullYear() + 1); // For demo persona
+        const adjustedTimestamp = new Date(now.getTime() + (6 * 60 * 60 * 1000) + 1000);
+        adjustedTimestamp.setFullYear(adjustedTimestamp.getFullYear() + 1);
 
         const attendanceData = {
             coords: simulatedCoords,
@@ -159,32 +177,60 @@ const AttendanceLog: React.FC = () => {
 
     }, [validatedUser]);
     
+    const handleCameraStateChange = useCallback((state: CaptureState, error?: string | null) => {
+        setCameraStatus(state);
+        if (state === 'NO_CAMERA') {
+            setIsVerifying(false);
+            setVerificationMessage('');
+        }
+    }, []);
 
-    const handleMarkAttendance = async () => {
+    const handleMarkAttendanceClick = () => {
         if (!validatedUser) return;
 
-        // --- Start of sequence ---
         setIsVerifying(true);
         setIsCameraOpen(true);
-        setIsAligned(false);
-        setVerificationMessage('Aligning face...');
-
-        // 1. Alignment delay (1-10 seconds)
-        const alignmentDelay = 1000 + Math.random() * 9000;
-        await new Promise(resolve => setTimeout(resolve, alignmentDelay));
-        
-        setIsAligned(true); // Ring turns green
-        setVerificationMessage('Blink your eyes to capture attendance');
-
-        // 2. Blink detection delay (2-5 seconds)
-        const blinkDelay = 2000 + Math.random() * 3000;
-        await new Promise(resolve => setTimeout(resolve, blinkDelay));
-        
-        setVerificationMessage('Processing...');
-        await onCaptureSuccess();
+        setVerificationMessage('Starting camera...');
     };
+
+    useEffect(() => {
+        if (!isVerifying || cameraStatus !== 'STREAMING') {
+            return;
+        }
+
+        let isCancelled = false;
+        
+        const runVerificationSequence = async () => {
+            setIsAligned(false);
+            setVerificationMessage('Aligning face...');
+            
+            const alignmentDelay = 1000 + Math.random() * 9000;
+            await new Promise(resolve => setTimeout(resolve, alignmentDelay));
+            if (isCancelled) return;
+
+            setIsAligned(true);
+            setVerificationMessage('Blink your eyes to capture attendance');
+
+            const blinkDelay = 2000 + Math.random() * 3000;
+            await new Promise(resolve => setTimeout(resolve, blinkDelay));
+            if (isCancelled) return;
+            
+            setVerificationMessage('Processing...');
+            await onCaptureSuccess();
+        };
+
+        runVerificationSequence();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isVerifying, cameraStatus, onCaptureSuccess]);
+
     
     const getButtonState = () => {
+        if (hasCameraDevice === false) {
+            return { text: "No Camera Detected", disabled: true };
+        }
         if (!validatedUser || !model) {
             return { text: "Mark Attendance", disabled: true };
         }
@@ -215,7 +261,7 @@ const AttendanceLog: React.FC = () => {
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Select Year & Branch, type Roll No. Name appears on the right.</p>
                 </div>
                 <button 
-                    onClick={handleMarkAttendance}
+                    onClick={handleMarkAttendanceClick}
                     disabled={buttonState.disabled}
                     className="w-full text-xl font-bold py-4 rounded-2xl transition-all duration-300 ease-in-out shadow-lg text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transform hover:scale-105"
                 >
@@ -236,9 +282,10 @@ const AttendanceLog: React.FC = () => {
                  <div className="w-64 h-64">
                     <WebcamCapture 
                         isCameraOpen={isCameraOpen}
+                        onCameraStateChange={handleCameraStateChange}
                     />
                  </div>
-                 {isVerifying && (
+                 {isVerifying && cameraStatus === 'STREAMING' && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-2xl">
                         <div className="text-white text-center p-4 bg-black bg-opacity-50 rounded-lg">
                             <p className="font-bold text-lg">{verificationMessage}</p>

@@ -38,20 +38,193 @@ const FeatureCard: React.FC<{feature: Feature, onSelect: (id: View) => void}> = 
     </div>
 );
 
+const AccuracyBar: React.FC<{ current: number; previous: number }> = ({ current, previous }) => (
+    <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <h4 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Generation Accuracy</h4>
+        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-6 relative overflow-hidden">
+            <div
+                className="bg-green-500 h-full rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${current}%` }}
+            />
+            <span className="absolute inset-0 flex items-center justify-center font-semibold text-white text-sm">
+                {current.toFixed(1)}%
+            </span>
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 text-center">
+            Compared to previous run: {previous.toFixed(1)}%
+        </p>
+    </div>
+);
+
+
 const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, onBack }) => {
     const [inputText, setInputText] = useState('');
     const [output, setOutput] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [accuracy, setAccuracy] = useState<number | null>(null);
+    const [previousAccuracy] = useState(75 + Math.random() * 20); // Mock previous accuracy
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setUploadedFile(file);
+            if (file.type.startsWith("text/")) {
+                const text = await file.text();
+                setInputText(text);
+            } else {
+                 setInputText(`File uploaded: ${file.name}\n\n(File content will be processed upon generation)`);
+            }
+        }
+    };
+    
+    const handleDownloadUploaded = () => {
+        if (!uploadedFile) return;
+        const url = URL.createObjectURL(uploadedFile);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = uploadedFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExport = (format: 'csv' | 'pdf') => {
+        if (!output) return;
+    
+        const filename = `${feature.title.replace(/\s+/g, '_')}_output`;
+    
+        if (format === 'csv') {
+            let csvContent = '';
+            
+            const escapeCsv = (field: any): string => {
+                if (field === null || field === undefined) return '';
+                const str = String(field);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+    
+            if (feature.outputType === 'text' || feature.outputType === 'mindmap') {
+                csvContent = escapeCsv(output);
+            } else if (feature.outputType === 'ppt') {
+                const header = ['slide_number', 'slide_title', 'point_number', 'point_text', 'speaker_notes'];
+                csvContent += header.join(',') + '\n';
+                (output.slides as PptSlide[]).forEach((slide, slideIndex) => {
+                    slide.points.forEach((point, pointIndex) => {
+                        const row = [
+                            slideIndex + 1,
+                            escapeCsv(slide.title),
+                            pointIndex + 1,
+                            escapeCsv(point),
+                            escapeCsv(slide.notes || '')
+                        ];
+                        csvContent += row.join(',') + '\n';
+                    });
+                });
+            } else if (feature.outputType === 'quiz') {
+                const header = ['question_number', 'type', 'question', 'options', 'answer'];
+                csvContent += header.join(',') + '\n';
+                (output.questions as QuizQuestion[]).forEach((q, index) => {
+                    const row = [
+                        index + 1,
+                        escapeCsv(q.type),
+                        escapeCsv(q.question),
+                        escapeCsv(q.options?.join('; ') || ''),
+                        escapeCsv(q.answer)
+                    ];
+                    csvContent += row.join(',') + '\n';
+                });
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${filename}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+    
+        } else if (format === 'pdf') {
+            let htmlContent = `
+                <html>
+                <head>
+                    <title>${feature.title}</title>
+                    <style>
+                        body { font-family: sans-serif; line-height: 1.5; }
+                        h1 { color: #333; }
+                        h2 { color: #555; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                        ul { padding-left: 20px; }
+                        li { margin-bottom: 5px; }
+                        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+                        .quiz-item, .slide { border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+                        .answer { font-weight: bold; color: green; }
+                    </style>
+                </head>
+                <body>
+                    <h1>${feature.title}</h1>
+            `;
+    
+            if (feature.outputType === 'text') {
+                htmlContent += `<p>${output.replace(/\n/g, '<br/>')}</p>`;
+            } else if (feature.outputType === 'mindmap') {
+                htmlContent += `<pre>${output}</pre>`;
+            } else if (feature.outputType === 'ppt') {
+                (output.slides as PptSlide[]).forEach((slide, index) => {
+                    htmlContent += `
+                        <div class="slide">
+                            <h2>Slide ${index + 1}: ${slide.title}</h2>
+                            <ul>
+                                ${slide.points.map((p: string) => `<li>${p}</li>`).join('')}
+                            </ul>
+                            ${slide.notes ? `<p><strong>Notes:</strong> ${slide.notes}</p>` : ''}
+                        </div>
+                    `;
+                });
+            } else if (feature.outputType === 'quiz') {
+                (output.questions as QuizQuestion[]).forEach((q, index) => {
+                    htmlContent += `
+                        <div class="quiz-item">
+                            <p><strong>${index + 1}. ${q.question}</strong> (${q.type})</p>
+                            ${q.options ? `<ul>${q.options.map((opt: string) => `<li>${opt}</li>`).join('')}</ul>` : ''}
+                            <p class="answer">Answer: ${q.answer}</p>
+                        </div>
+                    `;
+                });
+            }
+    
+            htmlContent += '</body></html>';
+            
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write(htmlContent);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            } else {
+                alert('Could not open print window. Please disable your pop-up blocker and try again.');
+            }
+        }
+    };
 
     const handleGenerate = async () => {
         if (!inputText) return;
         setIsLoading(true);
         setError(null);
         setOutput(null);
+        setAccuracy(null);
         try {
             const result = await feature.generator(inputText);
             setOutput(result);
+            // Simulate new accuracy based on previous
+            const newAccuracy = Math.max(0, Math.min(100, previousAccuracy + (Math.random() * 10 - 4)));
+            setAccuracy(newAccuracy);
         } catch (err) {
             console.error(err);
             setError("An error occurred while generating the content. Please try again.");
@@ -80,24 +253,44 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
                         placeholder={feature.prompt}
                         className="w-full flex-grow p-4 text-base bg-slate-100 dark:bg-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
+                    <div className="mt-4">
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Or upload a file (text, pdf, images)</label>
+                        <div className="flex items-center gap-2">
+                             <input type="file" onChange={handleFileChange} accept="image/*,application/pdf,.txt" className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                            {uploadedFile && (
+                                <button onClick={handleDownloadUploaded} title="Download uploaded file" className="text-sm font-semibold p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600">
+                                    <DownloadIcon className="w-5 h-5"/>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                     <button onClick={handleGenerate} disabled={isLoading || !inputText} className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 transition-colors">
                         <SparklesIcon className="w-5 h-5"/>
                         {isLoading ? 'Generating...' : 'Generate'}
                     </button>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-6 overflow-y-auto">
+                <div className="bg-white dark:bg-slate-800 p-6 flex flex-col">
                     <div className="flex justify-between items-center mb-2">
                         <h3 className="text-lg font-semibold">Output</h3>
                         {output && (
-                             <button onClick={() => alert('Download initiated!')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
-                                <DownloadIcon className="w-4 h-4" /> Export
-                            </button>
+                             <div className="flex items-center gap-2">
+                                <button onClick={() => handleExport('csv')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
+                                    <DownloadIcon className="w-4 h-4" /> CSV
+                                </button>
+                                <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
+                                    <DownloadIcon className="w-4 h-4" /> PDF
+                                </button>
+                            </div>
                         )}
                     </div>
-                    <div className="p-4 bg-slate-50 dark:bg-slate-900/70 rounded-lg min-h-[200px]">
-                        {isLoading && <p>Generating, please wait...</p>}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-900/70 rounded-lg flex-grow overflow-y-auto">
+                        {isLoading && <p className="text-center text-slate-500">Generating, please wait...</p>}
                         {error && <p className="text-red-500">{error}</p>}
+                        {!isLoading && !output && <p className="text-center text-slate-500">Output will appear here.</p>}
                         {output && <OutputDisplay output={output} type={feature.outputType} />}
+                        {output && accuracy && (
+                            <AccuracyBar current={accuracy} previous={previousAccuracy} />
+                        )}
                     </div>
                 </div>
             </div>
