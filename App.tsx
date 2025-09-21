@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -51,7 +52,7 @@ const App: React.FC = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             setIsLoading(false);
-        }, 2800);
+        }, 1500); // Reduced splash screen time
         return () => clearTimeout(timer);
     }, []);
 

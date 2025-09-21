@@ -117,16 +117,14 @@ type TimelineEvent = {
 };
 
 const generateDemoTimeline = (): { timeline: TimelineEvent[] } => {
-    const pickAlign = Math.floor(Math.random() * 5) + 1; // 1-5
-    const pickBlink = Math.floor(Math.random() * 3) + 6; // 6-8
-    const pickReport = Math.floor(Math.random() * 2) + 9; // 9-10
-
     const timeline: TimelineEvent[] = [
-        { label: 'aligning_face', pick_second: pickAlign, start_s: Math.max(0.1, pickAlign - 0.9), end_s: pickAlign + 0.9 },
-        { label: 'green_outline_and_blink', pick_second: pickBlink, start_s: pickBlink - 0.9, end_s: pickBlink + 0.9 },
-        { label: 'attendance_report', pick_second: pickReport, start_s: pickReport - 0.9, end_s: Math.min(10.0, pickReport + 0.9) }
+        // Align face for 1 second
+        { label: 'aligning_face', pick_second: 0, start_s: 0.1, end_s: 1.0 },
+        // Blink prompt for 1.5 seconds
+        { label: 'green_outline_and_blink', pick_second: 0, start_s: 1.0, end_s: 2.5 },
+        // Report generation starts at 2.5 seconds
+        { label: 'attendance_report', pick_second: 0, start_s: 2.5, end_s: 3.0 }
     ];
-    
     return { timeline };
 };
 
