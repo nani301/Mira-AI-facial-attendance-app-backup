@@ -213,8 +213,8 @@ const Reports: React.FC = () => {
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
-                                // FIX: The 'percent' property from recharts can be undefined. Coalesce to 0 to prevent a TypeError during multiplication.
-                                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                // FIX: The 'percent' property from recharts can be undefined. Using nullish coalescing operator (??) to provide a default value of 0 prevents a TypeError during multiplication.
+                                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                             >
                                 {pieData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

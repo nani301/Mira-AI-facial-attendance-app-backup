@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { User, AttendanceRecord } from '../types';
 import { getUserByDetails, markAttendance, sendEmail, getAttendanceByUserId } from '../services/mockApiService';
 import WebcamCapture from './WebcamCapture';
 import type { CaptureState } from './WebcamCapture';
-import { useModel } from '../services/modelService';
 import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, MailIcon, CalendarIcon, LocationIcon } from './Icons';
 
 const currentYear = new Date().getFullYear();
@@ -111,19 +109,45 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
         });
 }
 
+type TimelineEvent = {
+    label: string;
+    pick_second: number;
+    start_s: number;
+    end_s: number;
+};
+
+const generateDemoTimeline = (): { timeline: TimelineEvent[] } => {
+    const pickAlign = Math.floor(Math.random() * 5) + 1; // 1-5
+    const pickBlink = Math.floor(Math.random() * 3) + 6; // 6-8
+    const pickReport = Math.floor(Math.random() * 2) + 9; // 9-10
+
+    const timeline: TimelineEvent[] = [
+        { label: 'aligning_face', pick_second: pickAlign, start_s: Math.max(0.1, pickAlign - 0.9), end_s: pickAlign + 0.9 },
+        { label: 'green_outline_and_blink', pick_second: pickBlink, start_s: pickBlink - 0.9, end_s: pickBlink + 0.9 },
+        { label: 'attendance_report', pick_second: pickReport, start_s: pickReport - 0.9, end_s: Math.min(10.0, pickReport + 0.9) }
+    ];
+    
+    return { timeline };
+};
+
 
 const AttendanceLog: React.FC = () => {
     const [step, setStep] = useState<'capture' | 'result'>('capture');
     const [validatedUser, setValidatedUser] = useState<User | null>(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [isAligned, setIsAligned] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
-    const [verificationMessage, setVerificationMessage] = useState('');
     const [lastAttendance, setLastAttendance] = useState<{ coords: { latitude: number; longitude: number }; timestamp: Date } | null>(null);
     const [pinSelectorKey, setPinSelectorKey] = useState(Date.now());
-    const model = useModel();
     const [cameraStatus, setCameraStatus] = useState<CaptureState>('AWAITING_CAMERA');
     const [hasCameraDevice, setHasCameraDevice] = useState<boolean | null>(null);
+
+    // State for the mock attendance demo
+    const [demoMessage, setDemoMessage] = useState('');
+    const [outlineColor, setOutlineColor] = useState<'red' | 'green'>('red');
+    const [showBlinkPrompt, setShowBlinkPrompt] = useState(false);
+    const [demoTimeline, setDemoTimeline] = useState<TimelineEvent[] | null>(null);
+    const [startTime, setStartTime] = useState<number | null>(null);
+
 
     useEffect(() => {
         const checkForCamera = async () => {
@@ -181,61 +205,83 @@ const AttendanceLog: React.FC = () => {
         setCameraStatus(state);
         if (state === 'NO_CAMERA') {
             setIsVerifying(false);
-            setVerificationMessage('');
+            setDemoMessage('');
         }
     }, []);
 
     const handleMarkAttendanceClick = () => {
         if (!validatedUser) return;
 
+        const { timeline } = generateDemoTimeline();
+        setDemoTimeline(timeline);
         setIsVerifying(true);
         setIsCameraOpen(true);
-        setVerificationMessage('Starting camera...');
+        setDemoMessage('Starting camera...');
+        setStartTime(null);
     };
 
     useEffect(() => {
-        if (!isVerifying || cameraStatus !== 'STREAMING') {
+        // Don't run the timer if the process isn't active
+        if (!isVerifying || !demoTimeline) {
             return;
         }
 
-        let isCancelled = false;
+        // Once the camera is streaming, record the start time for the 10s sequence
+        if (cameraStatus === 'STREAMING' && startTime === null) {
+            setStartTime(Date.now());
+            return; // Return to re-trigger effect with the new startTime
+        }
         
-        const runVerificationSequence = async () => {
-            setIsAligned(false);
-            setVerificationMessage('Aligning face...');
-            
-            const alignmentDelay = 1000 + Math.random() * 9000;
-            await new Promise(resolve => setTimeout(resolve, alignmentDelay));
-            if (isCancelled) return;
+        // Wait until the start time has been recorded
+        if (startTime === null) {
+            return;
+        }
 
-            setIsAligned(true);
-            setVerificationMessage('Blink your eyes to capture attendance');
+        const interval = setInterval(() => {
+            const elapsedSeconds = (Date.now() - startTime) / 1000;
 
-            const blinkDelay = 2000 + Math.random() * 3000;
-            await new Promise(resolve => setTimeout(resolve, blinkDelay));
-            if (isCancelled) return;
-            
-            setVerificationMessage('Processing...');
-            await onCaptureSuccess();
-        };
+            const alignEvent = demoTimeline[0];
+            const blinkEvent = demoTimeline[1];
+            const reportEvent = demoTimeline[2];
 
-        runVerificationSequence();
+            // Check events in reverse order to handle transitions correctly
+            if (elapsedSeconds >= reportEvent.start_s) {
+                onCaptureSuccess(); // This will clear the interval via isVerifying=false
+                return;
+            }
 
-        return () => {
-            isCancelled = true;
-        };
-    }, [isVerifying, cameraStatus, onCaptureSuccess]);
+            if (elapsedSeconds >= blinkEvent.start_s) {
+                // In the blink phase
+                setDemoMessage('');
+                setOutlineColor('green');
+                setShowBlinkPrompt(true);
+            } else if (elapsedSeconds >= alignEvent.start_s) {
+                // In the align phase
+                setDemoMessage('Align your face...');
+                setOutlineColor('red');
+                setShowBlinkPrompt(false);
+            }
+
+            // Hide blink prompt after its time is up
+            if (elapsedSeconds >= blinkEvent.end_s) {
+                setShowBlinkPrompt(false);
+            }
+        }, 100); // Check progress every 100ms
+
+        return () => clearInterval(interval);
+
+    }, [isVerifying, cameraStatus, demoTimeline, startTime, onCaptureSuccess]);
 
     
     const getButtonState = () => {
         if (hasCameraDevice === false) {
             return { text: "No Camera Detected", disabled: true };
         }
-        if (!validatedUser || !model) {
+        if (!validatedUser) {
             return { text: "Mark Attendance", disabled: true };
         }
         if (isVerifying) {
-            return { text: verificationMessage, disabled: true };
+            return { text: demoMessage || 'Processing...', disabled: true };
         }
         return { text: "Mark Attendance", disabled: false };
     };
@@ -245,10 +291,11 @@ const AttendanceLog: React.FC = () => {
         setStep('capture');
         setValidatedUser(null);
         setIsVerifying(false);
-        setIsAligned(false);
         setIsCameraOpen(false);
         setLastAttendance(null);
-        setVerificationMessage('');
+        setDemoMessage('');
+        setDemoTimeline(null); // Reset timeline
+        setStartTime(null);
         setPinSelectorKey(Date.now()); // Reset PinSelector
     };
 
@@ -278,7 +325,7 @@ const AttendanceLog: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg flex items-center justify-center relative aspect-square md:aspect-auto">
-                 <div className={`absolute inset-2 rounded-full border-8 transition-all duration-500 ${isAligned ? 'border-green-500' : 'border-red-500'} ${isCameraOpen ? 'opacity-100' : 'opacity-0'}`}></div>
+                 <div className={`absolute inset-2 rounded-full border-8 transition-all duration-500 ${outlineColor === 'green' ? 'border-green-500' : 'border-red-500'} ${isCameraOpen ? 'opacity-100' : 'opacity-0'}`}></div>
                  <div className="w-64 h-64">
                     <WebcamCapture 
                         isCameraOpen={isCameraOpen}
@@ -287,9 +334,18 @@ const AttendanceLog: React.FC = () => {
                  </div>
                  {isVerifying && cameraStatus === 'STREAMING' && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-2xl">
-                        <div className="text-white text-center p-4 bg-black bg-opacity-50 rounded-lg">
-                            <p className="font-bold text-lg">{verificationMessage}</p>
-                            <div className="w-12 h-12 border-2 border-dashed rounded-full animate-spin border-white mx-auto mt-2"></div>
+                        <div className="text-white text-center p-4">
+                            {showBlinkPrompt ? (
+                                <div className="bg-white/90 text-slate-800 rounded-lg p-4 shadow-2xl animate-pulse">
+                                    <p className="font-bold text-xl">Blink your eyes</p>
+                                    <p className="text-sm">to mark attendance</p>
+                                </div>
+                            ) : demoMessage ? (
+                                <>
+                                    <p className="font-bold text-lg">{demoMessage}</p>
+                                    <div className="w-12 h-12 border-2 border-dashed rounded-full animate-spin border-white mx-auto mt-2"></div>
+                                </>
+                            ) : null}
                         </div>
                     </div>
                  )}

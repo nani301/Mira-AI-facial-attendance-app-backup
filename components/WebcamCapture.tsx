@@ -6,9 +6,10 @@ export type CaptureState = 'AWAITING_CAMERA' | 'STREAMING' | 'NO_CAMERA';
 interface WebcamCaptureProps {
     isCameraOpen: boolean;
     onCameraStateChange?: (state: CaptureState, error?: string | null) => void;
+    onVideoReady?: (videoElement: HTMLVideoElement) => void;
 }
 
-const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen, onCameraStateChange }) => {
+const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen, onCameraStateChange, onVideoReady }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const [captureState, setCaptureState] = useState<CaptureState>('AWAITING_CAMERA');
@@ -26,6 +27,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen, onCameraSta
                     videoRef.current.onloadedmetadata = () => {
                         setCaptureState('STREAMING');
                         onCameraStateChange?.('STREAMING');
+                        if (videoRef.current) {
+                            onVideoReady?.(videoRef.current);
+                        }
                     };
                 }
             } catch (err: any) {
@@ -45,7 +49,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ isCameraOpen, onCameraSta
              setCaptureState('NO_CAMERA');
              onCameraStateChange?.('NO_CAMERA', errorMessage);
         }
-    }, [onCameraStateChange]);
+    }, [onCameraStateChange, onVideoReady]);
     
     const stopCamera = useCallback(() => {
         if (streamRef.current) {

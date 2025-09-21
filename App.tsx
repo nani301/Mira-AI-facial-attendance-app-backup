@@ -15,8 +15,16 @@ import ApplicationsPage from './components/ApplicationsPage';
 import SbtetResultsPage from './components/SbtetResultsPage';
 import TimetablePage from './components/TimetablePage';
 import FeedbackPage from './components/FeedbackPage';
+import Login from './components/Login';
+import SplashScreen from './components/SplashScreen';
 
 const App: React.FC = () => {
+    // State for splash screen
+    const [isLoading, setIsLoading] = useState(true);
+
+    // State for authentication
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
     // State for navigation
     const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
@@ -29,6 +37,15 @@ const App: React.FC = () => {
 
     // Sidebar visibility is now directly linked to the theme
     const isSidebarOpen = theme === 'dark';
+
+    // Splash screen timer effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 2800);
+        return () => clearTimeout(timer);
+    }, []);
+
 
     useEffect(() => {
         // Fetch initial user and faculty data
@@ -46,6 +63,10 @@ const App: React.FC = () => {
             localStorage.setItem('theme', 'light');
         }
     }, [theme]);
+    
+    const handleLogin = () => {
+        setIsAuthenticated(true);
+    };
 
     const toggleTheme = () => {
         setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
@@ -79,6 +100,14 @@ const App: React.FC = () => {
             default: return <Dashboard setCurrentPage={handlePageChange} />;
         }
     };
+    
+    if (isLoading) {
+        return <SplashScreen />;
+    }
+
+    if (!isAuthenticated) {
+        return <Login onLoginSuccess={handleLogin} />;
+    }
     
     return (
         <div className="relative min-h-screen bg-slate-100 dark:bg-slate-900">
