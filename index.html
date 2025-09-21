@@ -74,6 +74,29 @@
         transform: scale(1);
       }
     }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .printable-area, .printable-area * {
+        visibility: visible;
+      }
+      .printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+          display: none !important;
+      }
+      /* Ensure backgrounds are printed */
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
   </style>
 </head>
   <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">

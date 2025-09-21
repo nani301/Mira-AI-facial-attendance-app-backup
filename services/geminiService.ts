@@ -43,6 +43,9 @@ export const generateReportSummary = async (records: AttendanceRecord[]): Promis
             model: model,
             contents: prompt,
         });
+        if (!response.text) {
+            return "AI could not generate a summary. The response was empty, possibly due to content filtering.";
+        }
         return response.text;
     } catch (error) {
         console.error("Error generating report summary from Gemini:", error);
@@ -70,6 +73,9 @@ ${text}
             model: model,
             contents: prompt,
         });
+        if (!response.text) {
+            return "AI could not generate a summary. The response was empty.";
+        }
         return response.text;
     } catch (error) {
         console.error("Error generating summary from Gemini:", error);
@@ -91,6 +97,9 @@ ${notes}
 
 Summary:`;
     const response = await ai.models.generateContent({ model, contents: prompt });
+    if (!response.text) {
+        throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a response.");
+    }
     return response.text;
 };
 
@@ -106,6 +115,9 @@ ${topics}
 
 Predicted Questions:`;
     const response = await ai.models.generateContent({ model, contents: prompt });
+    if (!response.text) {
+        throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a response.");
+    }
     return response.text;
 };
 
@@ -118,31 +130,43 @@ Text:
 ---
 ${text}
 ---`;
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    title: { type: Type.STRING },
-                    slides: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                title: { type: Type.STRING },
-                                points: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                notes: { type: Type.STRING }
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        slides: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    points: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    notes: { type: Type.STRING }
+                                }
                             }
                         }
                     }
                 }
             }
+        });
+        if (!response.text) {
+            throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a valid JSON response.");
         }
-    });
-    return JSON.parse(response.text);
+        return JSON.parse(response.text);
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            console.error("Failed to parse AI response for PPT:", error);
+            throw new Error("Failed to parse the AI's response. The format was not valid JSON.");
+        }
+        // Re-throw other errors to be caught by the UI
+        throw error;
+    }
 };
 
 
@@ -158,6 +182,9 @@ ${notes}
 
 Story Summary:`;
     const response = await ai.models.generateContent({ model, contents: prompt });
+    if (!response.text) {
+        throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a response.");
+    }
     return response.text;
 };
 
@@ -173,6 +200,9 @@ ${topic}
 
 Mind Map:`;
     const response = await ai.models.generateContent({ model, contents: prompt });
+    if (!response.text) {
+        throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a response.");
+    }
     return response.text;
 };
 
@@ -185,29 +215,41 @@ Text:
 ---
 ${notes}
 ---`;
-    const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    questions: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                type: { type: Type.STRING, description: 'e.g., "multiple-choice" or "short-answer"' },
-                                question: { type: Type.STRING },
-                                options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                answer: { type: Type.STRING }
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        questions: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    type: { type: Type.STRING, description: 'e.g., "multiple-choice" or "short-answer"' },
+                                    question: { type: Type.STRING },
+                                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    answer: { type: Type.STRING }
+                                }
                             }
                         }
                     }
                 }
             }
+        });
+        if (!response.text) {
+            throw new Error("Received an empty response from the AI. The content may have been blocked or the model could not generate a valid JSON response.");
         }
-    });
-    return JSON.parse(response.text);
+        return JSON.parse(response.text);
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            console.error("Failed to parse AI response for Quiz:", error);
+            throw new Error("Failed to parse the AI's response. The format was not valid JSON.");
+        }
+        // Re-throw other errors to be caught by the UI
+        throw error;
+    }
 };

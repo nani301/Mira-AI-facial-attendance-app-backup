@@ -7,16 +7,16 @@ type LoginProps = {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [activeTab, setActiveTab] = useState<'pin' | 'qr'>('pin');
-    const [pin, setPin] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState(''); // Simulated password
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // Simulate login success with any non-empty pin and password
-        if (pin.trim() && password.trim()) {
+        // Simulate login success with any non-empty email and password
+        if (email.trim() && password.trim()) {
             onLoginSuccess();
         } else {
-            alert("Please enter PIN and Password.");
+            alert("Please enter Email and Password.");
         }
     };
 
@@ -38,7 +38,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             className={`w-1/2 py-2.5 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${activeTab === 'pin' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-700/50'}`}
                         >
                             <MailIcon className="w-5 h-5" />
-                            Login with PIN
+                            Login with Email
                         </button>
                         <button
                             onClick={() => setActiveTab('qr')}
@@ -52,12 +52,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     {activeTab === 'pin' ? (
                         <form onSubmit={handleLogin} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">Your PIN</label>
+                                <label className="block text-sm font-medium text-slate-300 mb-1">Enter registered email</label>
                                 <input
-                                    type="text"
-                                    value={pin}
-                                    onChange={(e) => setPin(e.target.value)}
-                                    placeholder="e.g., FAC-01"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="e.g., user@mira.edu"
                                     className="w-full px-4 py-3 bg-slate-800/60 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-white"
                                 />
                             </div>

@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { User, AttendanceRecord } from '../types';
-import { getUserByDetails, markAttendance, sendEmail, getAttendanceByUserId } from '../services/mockApiService';
+import { AttendanceStatus, Role } from '../types';
+import { getUserByDetails, markAttendance, sendEmail, getAttendanceByUserId, getAcademicConstants, checkTodaysAttendance, getUserByPin } from '../services/mockApiService';
 import WebcamCapture from './WebcamCapture';
 import type { CaptureState } from './WebcamCapture';
 import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, MailIcon, CalendarIcon, LocationIcon } from './Icons';
@@ -11,7 +13,7 @@ const YEARS = Array.from({ length: 7 }, (_, i) => ({
     year: currentYear - i, 
     code: (currentYear - i) % 100 
 }));
-const BRANCHES = ['CS', 'EC', 'MECH', 'IT', 'CPS', 'EE'];
+const BRANCHES = ['CS', 'EC', 'MECH', 'IT', 'CPS', 'EE', 'Faculty', 'Principal', 'Staff'];
 const COLLEGE_CODE = '210';
 
 // --- NEW: Geo-fencing Simulation ---
@@ -52,44 +54,65 @@ const PinSelector: React.FC<{ onUserFound: (user: User | null) => void; disabled
     const [roll, setRoll] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    const isStudentMode = !['Faculty', 'Principal', 'Staff'].includes(branch);
+
+    const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setBranch(e.target.value);
+        setRoll('');
+        onUserFound(null);
+    };
+
     const handleRollChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value.replace(/\D/g, '').slice(0, 3);
         setRoll(value);
     };
-
+    
     const debouncedFetchUser = useCallback(
-        debounce(async (details: { year: number; collegeCode: string; branch: string; roll: string }) => {
-            if (details.roll.length === 3) {
-                setIsLoading(true);
-                const user = await getUserByDetails(details);
-                onUserFound(user);
-                setIsLoading(false);
+        debounce(async (details: { isStudent: boolean; year: number; collegeCode: string; branch: string; roll: string }) => {
+            setIsLoading(true);
+            let user: User | null = null;
+            if (details.isStudent) {
+                if (details.roll.length === 3) {
+                    user = await getUserByDetails({ year: details.year, collegeCode: details.collegeCode, branch: details.branch, roll: details.roll });
+                }
             } else {
-                onUserFound(null);
+                if (details.roll.length > 0) {
+                    // Staff PIN is like FACULTY-01, HOD-02. Pad with 0 for single digit IDs.
+                    const pin = `${details.branch.toUpperCase()}-${details.roll.padStart(2, '0')}`;
+                    user = await getUserByPin(pin);
+                }
             }
+            onUserFound(user);
+            setIsLoading(false);
         }, 300),
         [onUserFound]
     );
 
     useEffect(() => {
-        debouncedFetchUser({ year, collegeCode: COLLEGE_CODE, branch, roll });
-    }, [year, branch, roll, debouncedFetchUser]);
+        debouncedFetchUser({ isStudent: isStudentMode, year, collegeCode: COLLEGE_CODE, branch, roll });
+    }, [isStudentMode, year, branch, roll, debouncedFetchUser]);
 
     const inputBaseClasses = "text-lg md:text-xl lg:text-2xl font-semibold bg-transparent focus:outline-none text-slate-800 dark:text-slate-100 disabled:opacity-50";
     
     return (
         <div className={`flex items-center border-2 bg-slate-100 dark:bg-slate-700 rounded-2xl p-2 transition-all ${isLoading ? 'border-indigo-500 animate-pulse' : 'border-slate-300 dark:border-slate-600'}`}>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} disabled={disabled} className={`${inputBaseClasses} appearance-none`}>
-                {YEARS.map(y => <option key={y.year} value={y.code}>{y.code}{COLLEGE_CODE}</option>)}
-            </select>
-            <span className="text-slate-400 mx-2">/</span>
-            <select value={branch} onChange={e => setBranch(e.target.value)} disabled={disabled} className={`${inputBaseClasses} appearance-none`}>
+            {isStudentMode ? (
+                <>
+                    <select value={year} onChange={e => setYear(Number(e.target.value))} disabled={disabled} className={`${inputBaseClasses} appearance-none`}>
+                        {YEARS.map(y => <option key={y.year} value={y.code}>{y.code}{COLLEGE_CODE}</option>)}
+                    </select>
+                    <span className="text-slate-400 mx-2">/</span>
+                </>
+            ) : (
+                <span className={`${inputBaseClasses} text-slate-500 dark:text-slate-400 pl-2`}>210 /</span>
+            )}
+            <select value={branch} onChange={handleBranchChange} disabled={disabled} className={`${inputBaseClasses} appearance-none`}>
                 {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
             <span className="text-slate-400 mx-2">/</span>
             <input 
                 type="text" 
-                placeholder="001" 
+                placeholder={isStudentMode ? "001" : "ID"} 
                 value={roll} 
                 onChange={handleRollChange} 
                 disabled={disabled}
@@ -118,12 +141,12 @@ type TimelineEvent = {
 
 const generateDemoTimeline = (): { timeline: TimelineEvent[] } => {
     const timeline: TimelineEvent[] = [
-        // Align face for 1 second
-        { label: 'aligning_face', pick_second: 0, start_s: 0.1, end_s: 1.0 },
-        // Blink prompt for 1.5 seconds
-        { label: 'green_outline_and_blink', pick_second: 0, start_s: 1.0, end_s: 2.5 },
-        // Report generation starts at 2.5 seconds
-        { label: 'attendance_report', pick_second: 0, start_s: 2.5, end_s: 3.0 }
+        // Align face for 3 seconds
+        { label: 'aligning_face', pick_second: 0, start_s: 0.1, end_s: 3.0 },
+        // Blink prompt for 2 seconds
+        { label: 'green_outline_and_blink', pick_second: 0, start_s: 3.0, end_s: 5.0 },
+        // Report generation starts at 7.5 seconds (leaving a 2.5-second gap for "processing")
+        { label: 'attendance_report', pick_second: 0, start_s: 7.5, end_s: 8.0 }
     ];
     return { timeline };
 };
@@ -207,8 +230,14 @@ const AttendanceLog: React.FC = () => {
         }
     }, []);
 
-    const handleMarkAttendanceClick = () => {
+    const handleMarkAttendanceClick = async () => {
         if (!validatedUser) return;
+
+        const existingRecord = await checkTodaysAttendance(validatedUser.id);
+        if (existingRecord && existingRecord.checkInTime) {
+            alert(`Your attendance was already marked today at ${existingRecord.checkInTime}.`);
+            return;
+        }
 
         const { timeline } = generateDemoTimeline();
         setDemoTimeline(timeline);
@@ -248,20 +277,20 @@ const AttendanceLog: React.FC = () => {
                 return;
             }
 
-            if (elapsedSeconds >= blinkEvent.start_s) {
-                // In the blink phase
+            if (elapsedSeconds >= blinkEvent.end_s) {
+                // Processing phase (after blink, before report)
+                setDemoMessage('Processing...');
+                setOutlineColor('green');
+                setShowBlinkPrompt(false);
+            } else if (elapsedSeconds >= blinkEvent.start_s) {
+                // Blink phase
                 setDemoMessage('');
                 setOutlineColor('green');
                 setShowBlinkPrompt(true);
             } else if (elapsedSeconds >= alignEvent.start_s) {
-                // In the align phase
+                // Align phase
                 setDemoMessage('Align your face...');
                 setOutlineColor('red');
-                setShowBlinkPrompt(false);
-            }
-
-            // Hide blink prompt after its time is up
-            if (elapsedSeconds >= blinkEvent.end_s) {
                 setShowBlinkPrompt(false);
             }
         }, 100); // Check progress every 100ms
@@ -301,9 +330,9 @@ const AttendanceLog: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[60vh]">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg flex flex-col justify-between">
                 <div>
-                    <h3 className="text-xl font-bold mb-4">Student Identification</h3>
+                    <h3 className="text-xl font-bold mb-4">User Identification</h3>
                     <PinSelector key={pinSelectorKey} onUserFound={handleUserFound} disabled={isVerifying}/>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Select Year & Branch, type Roll No. Name appears on the right.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Select Role &amp; type ID. Name appears on the right.</p>
                 </div>
                 <button 
                     onClick={handleMarkAttendanceClick}
@@ -356,7 +385,7 @@ const AttendanceLog: React.FC = () => {
                 <p className="text-slate-500 dark:text-slate-400">
                     {isVerifying ? 
                         "Keep your face steady within the circle. Ensure you are in a well-lit area for best results." :
-                        "After identifying the student, click 'Mark Attendance'. The camera will activate for facial verification."
+                        "After identifying the user, click 'Mark Attendance'. The camera will activate for facial verification."
                     }
                 </p>
             </div>
@@ -415,13 +444,37 @@ const OverallAttendanceBar: React.FC<{ present: number; absent: number; total: n
 
 const ResultView: React.FC<{ user: User; attendanceInfo: { coords: { latitude: number; longitude: number; }; timestamp: Date; }; onRetake: () => void }> = ({ user, attendanceInfo, onRetake }) => {
     
+    const [userRecords, setUserRecords] = useState<AttendanceRecord[]>([]);
+    const [academicConstants, setAcademicConstants] = useState({ totalWorkingDays: 120, requiredAttendancePercentage: 75 });
+    
+    const isStudent = user.role === Role.STUDENT;
+
+    useEffect(() => {
+        getAttendanceByUserId(user.id).then(setUserRecords);
+        if (isStudent) {
+            getAcademicConstants().then(setAcademicConstants);
+        }
+    }, [user.id, isStudent]);
+    
     const overallStats = useMemo(() => {
-        const presentDays = 48;
-        const workingDays = 121;
-        const absentDays = 19; // Using provided mock data
-        const percentage = workingDays > 0 ? (presentDays / workingDays) * 100 : 0;
-        return { present: presentDays, absent: absentDays, total: workingDays, percentage };
-    }, [user.id]);
+        const presentDays = userRecords.filter(r => r.status === AttendanceStatus.PRESENT || r.status === AttendanceStatus.LATE).length;
+        const absentDays = userRecords.filter(r => r.status === AttendanceStatus.ABSENT).length;
+        
+        const totalWorkingDays = academicConstants.totalWorkingDays;
+        const percentage = totalWorkingDays > 0 ? (presentDays / totalWorkingDays) * 100 : 0;
+
+        const requiredDays = totalWorkingDays * (academicConstants.requiredAttendancePercentage / 100);
+        const maxAbsentDays = totalWorkingDays - requiredDays;
+        const leftoverDays = Math.max(0, Math.floor(maxAbsentDays - absentDays));
+
+        return { 
+            present: presentDays, 
+            absent: absentDays, 
+            total: totalWorkingDays, 
+            percentage, 
+            leftoverDays 
+        };
+    }, [userRecords, academicConstants]);
     
     const stockMarketTrendData = useMemo(() => {
         let score = 75; // Starting score
@@ -434,80 +487,112 @@ const ResultView: React.FC<{ user: User; attendanceInfo: { coords: { latitude: n
         return trend;
     }, [user.id]);
 
+    const femaleStaffNames = [
+        'P. JANAKI DEVI', 'Dr. S.N PADMAVATHI', 'VANGALA INDIRA PRIYA DARSINI', 'B. SREE LAKSHMI',
+        'NAMBURU GOWTAMI', 'T.MANJULA', 'WASEEM RUKSANA', 'AFROZE JABEEN', 'C.SATYAVATHI',
+        'MANDALA LAXMI DEVI', 'G.V.BABITHA', 'NAYAKOTI SUPRIYA'
+    ];
+    const salutation = femaleStaffNames.includes(user.name) ? 'Madam' : 'Sir';
+
      return (
         <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-1">
-                    <CheckCircleIcon className="w-16 h-16 text-green-500 mb-4" />
-                    <h2 className="text-2xl font-bold">Attendance Marked</h2>
-                    <p className="text-slate-500 dark:text-slate-400">Successfully for <span className="font-semibold text-slate-700 dark:text-slate-200">{user.name}</span></p>
-                    <p className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded mt-2">{formatTimestamp(attendanceInfo.timestamp)}</p>
-                    <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 p-3 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-lg">
-                        <p className="font-semibold flex items-center justify-center gap-2"><LocationIcon className="w-4 h-4" /> Geo-fencing Success</p>
-                        <p className="text-xs">Coordinates matched successfully. You are inside campus area.</p>
-                    </div>
-                </div>
-                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg lg:col-span-2">
-                    <h3 className="font-bold mb-2">Analytics Overview</h3>
-                    <div className="space-y-4">
-                        <AttendanceTrendArrow percentage={overallStats.percentage} trend={'up'} />
-                        <OverallAttendanceBar present={overallStats.present} absent={overallStats.absent} total={overallStats.total}/>
-                        
-                         <p className="text-sm font-semibold pt-2">Attendance Trend (Last 30 Days)</p>
-                         <div className="h-32 -ml-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={stockMarketTrendData}>
-                                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2}/>
-                                    <XAxis dataKey="day" fontSize={10} />
-                                    <YAxis domain={[0, 100]} fontSize={10} unit="%"/>
-                                    <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.8)', border: 'none', borderRadius: '0.5rem' }}/>
-                                    <Line type="monotone" dataKey="score" stroke="#4f46e5" strokeWidth={2} dot={false} name="Attendance Score"/>
-                                </LineChart>
-                            </ResponsiveContainer>
+            {isStudent ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-1">
+                        <CheckCircleIcon className="w-16 h-16 text-green-500 mb-4" />
+                        <h2 className="text-2xl font-bold">Attendance Marked</h2>
+                        <p className="text-slate-500 dark:text-slate-400">Successfully for <span className="font-semibold text-slate-700 dark:text-slate-200">{user.name}</span></p>
+                        <p className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded mt-2">{formatTimestamp(attendanceInfo.timestamp)}</p>
+                        <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 p-3 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-lg">
+                            <p className="font-semibold flex items-center justify-center gap-2"><LocationIcon className="w-4 h-4" /> Geo-fencing Success</p>
+                            <p className="text-xs">Coordinates matched successfully. You are inside campus area.</p>
                         </div>
                     </div>
-                </div>
-                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg">
-                     <h3 className="font-bold mb-2 flex items-center gap-2"><MailIcon className="w-5 h-5"/>Notifications</h3>
-                     <p className="text-sm">Successfully sent email to you and your parents with time and coordinates.</p>
-                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-mono bg-slate-100 dark:bg-slate-700 p-2 rounded">
-                        {attendanceInfo.timestamp.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute:'2-digit' })}
-                        <br/>
-                        {attendanceInfo.coords.latitude.toFixed(6)}° N, {attendanceInfo.coords.longitude.toFixed(6)}° E
-                     </p>
-                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                        <h4 className="text-xs font-semibold uppercase text-slate-400">Attendance Codes</h4>
-                        <ul className="text-xs text-slate-500 dark:text-slate-400 mt-1 space-y-1">
-                            <li><b>P</b> = No. of days Present</li>
-                            <li><b>A</b> = No. of days Absent</li>
-                            <li><b>LD</b> = Leftover Days to reach percentage for semester exam</li>
-                            <li><b>WD</b> = Total Working Days</li>
-                        </ul>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg lg:col-span-2">
+                        <h3 className="font-bold mb-2">Analytics Overview</h3>
+                        <div className="space-y-4">
+                            <AttendanceTrendArrow percentage={overallStats.percentage} trend={'up'} />
+                            <OverallAttendanceBar present={overallStats.present} absent={overallStats.absent} total={overallStats.total}/>
+                            
+                            <p className="text-sm font-semibold pt-2">Attendance Trend (Last 30 Days)</p>
+                            <div className="h-32 -ml-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={stockMarketTrendData}>
+                                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2}/>
+                                        <XAxis dataKey="day" fontSize={10} />
+                                        <YAxis domain={[0, 100]} fontSize={10} unit="%"/>
+                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(30, 41, 59, 0.8)', border: 'none', borderRadius: '0.5rem' }}/>
+                                        <Line type="monotone" dataKey="score" stroke="#4f46e5" strokeWidth={2} dot={false} name="Attendance Score"/>
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg">
+                        <h3 className="font-bold mb-2 flex items-center gap-2"><MailIcon className="w-5 h-5"/>Notifications</h3>
+                        <p className="text-sm">Successfully sent email to you and your parents with time and coordinates.</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-mono bg-slate-100 dark:bg-slate-700 p-2 rounded">
+                            {attendanceInfo.timestamp.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute:'2-digit' })}
+                            <br/>
+                            {attendanceInfo.coords.latitude.toFixed(6)}° N, {attendanceInfo.coords.longitude.toFixed(6)}° E
+                        </p>
+                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <h4 className="text-xs font-semibold uppercase text-slate-400">Attendance Codes</h4>
+                            <ul className="text-xs text-slate-500 dark:text-slate-400 mt-1 space-y-1">
+                                <li><b>P</b> = No. of days Present</li>
+                                <li><b>A</b> = No. of days Absent</li>
+                                <li><b>LD</b> = Leftover Days to reach percentage for semester exam</li>
+                                <li><b>WD</b> = Total Working Days</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg lg:col-span-2">
+                        <MonthlyAttendanceGrid isStudent={isStudent} allRecords={userRecords} analytics={{ P: overallStats.present, A: overallStats.absent, LD: overallStats.leftoverDays, WD: overallStats.total }} />
+                    </div>
+                 </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center">
+                            <CheckCircleIcon className="w-16 h-16 text-green-500 mb-4" />
+                            <h2 className="text-2xl font-bold">Attendance Marked</h2>
+                            <p className="text-slate-500 dark:text-slate-400">Successfully for <span className="font-semibold text-slate-700 dark:text-slate-200">{user.name}</span></p>
+                            <p className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded mt-2">{formatTimestamp(attendanceInfo.timestamp)}</p>
+                            <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 p-3 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-lg">
+                                <p className="font-semibold flex items-center justify-center gap-2"><LocationIcon className="w-4 h-4" /> Geo-fencing Success</p>
+                                <p className="text-xs">Coordinates matched successfully. You are inside campus area.</p>
+                            </div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg">
+                            <h3 className="font-bold mb-2 flex items-center gap-2"><MailIcon className="w-5 h-5"/>Notifications</h3>
+                            <p className="text-sm">Successfully sent an attendance confirmation to your registered email, {salutation}.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-mono bg-slate-100 dark:bg-slate-700 p-2 rounded">
+                                {attendanceInfo.timestamp.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute:'2-digit' })}
+                                <br/>
+                                {attendanceInfo.coords.latitude.toFixed(6)}° N, {attendanceInfo.coords.longitude.toFixed(6)}° E
+                            </p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg">
+                        <MonthlyAttendanceGrid isStudent={isStudent} allRecords={userRecords} analytics={{ P: 0, A: 0, LD: 0, WD: 0 }} />
                     </div>
                 </div>
-                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg lg:col-span-2">
-                    <MonthlyAttendanceGrid userId={user.id} />
-                 </div>
-            </div>
-            <button onClick={onRetake} className="w-full font-bold py-3 rounded-2xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600">Mark for Another Student</button>
+            )}
+           
+            <button onClick={onRetake} className="w-full font-bold py-3 rounded-2xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600">Mark for Another User</button>
         </div>
      );
 };
 
 
-const MonthlyAttendanceGrid: React.FC<{userId: string;}> = ({ userId }) => {
+const MonthlyAttendanceGrid: React.FC<{isStudent: boolean, allRecords: AttendanceRecord[], analytics: {P: number, A: number, LD: number, WD: number} }> = ({ isStudent, allRecords, analytics }) => {
     const [date, setDate] = useState(new Date());
-    const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
-    useEffect(() => {
-        getAttendanceByUserId(userId).then(setRecords);
-    }, [userId]);
-    
-    const presentDates = useMemo(() => new Set(records.map(r => r.date)), [records]);
-    
-    const analytics = useMemo(() => {
-        return { P: 48, A: 19, LD: 54, WD: 121 };
-    }, [userId]);
+    const recordMap = useMemo(() => {
+        const map = new Map<string, AttendanceStatus>();
+        allRecords.forEach(r => map.set(r.date, r.status));
+        return map;
+    }, [allRecords]);
 
     const month = date.getMonth();
     const year = date.getFullYear();
@@ -533,21 +618,41 @@ const MonthlyAttendanceGrid: React.FC<{userId: string;}> = ({ userId }) => {
                     <button onClick={() => changeMonth(1)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600"><ChevronRightIcon className="w-5 h-5" /></button>
                 </div>
             </div>
-            <div className="flex justify-around text-xs font-semibold text-center mb-2 p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                <span><span className="font-bold text-green-500">P:</span> {analytics.P}</span>
-                <span><span className="font-bold text-red-500">A:</span> {analytics.A}</span>
-                <span><span className="font-bold text-blue-500">LD:</span> {analytics.LD}</span>
-                <span><span className="font-bold text-slate-500">WD:</span> {analytics.WD}</span>
-            </div>
+            {isStudent && (
+                 <div className="flex justify-around text-xs font-semibold text-center mb-2 p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                    <span><span className="font-bold text-green-500">P:</span> {analytics.P}</span>
+                    <span><span className="font-bold text-red-500">A:</span> {analytics.A}</span>
+                    <span><span className="font-bold text-blue-500">LD:</span> {analytics.LD}</span>
+                    <span><span className="font-bold text-slate-500">WD:</span> {analytics.WD}</span>
+                </div>
+            )}
             <div className="grid grid-cols-7 gap-1 text-center text-xs">
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => <div key={day} className="font-bold text-slate-500">{day}</div>)}
                 {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`}></div>)}
                 {Array.from({ length: daysInMonth }).map((_, day) => {
                     const currentDate = new Date(year, month, day + 1);
                     const dateString = formatDate(currentDate);
-                    const isPresent = presentDates.has(dateString);
+                    const status = recordMap.get(dateString);
+                    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+
+                    let cellClass = 'bg-slate-100 dark:bg-slate-700';
+                    if (isWeekend) {
+                        cellClass = 'bg-slate-200 dark:bg-slate-600/50 text-slate-400';
+                    } else {
+                         switch (status) {
+                            case AttendanceStatus.PRESENT:
+                            case AttendanceStatus.LATE:
+                                cellClass = 'ring-2 ring-green-500 text-slate-800 dark:text-slate-100';
+                                break;
+                            case AttendanceStatus.ABSENT:
+                                // No special styling for absent days to make them look "empty" as per user request.
+                                // It will use the default cell class defined above.
+                                break;
+                        }
+                    }
+
                     return (
-                        <div key={day} className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isPresent ? 'ring-2 ring-green-500 text-slate-800 dark:text-slate-100' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                        <div key={day} className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${cellClass}`}>
                             {day + 1}
                         </div>
                     );

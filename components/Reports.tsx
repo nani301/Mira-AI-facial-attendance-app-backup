@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { getAttendanceByDateAndBranch, getUsers } from '../services/mockApiService';
 import type { AttendanceRecord, User } from '../types';
 import { AttendanceStatus, Role } from '../types';
-import { ExportIcon } from './Icons';
+import { ExportIcon, ShareIcon } from './Icons';
 
 // Normalizes PIN input (e.g., "23101cs001" -> "23-101-CS-001")
 const normalizePin = (pin: string): string => {    
@@ -109,6 +109,7 @@ const Reports: React.FC = () => {
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isExportOpen, setIsExportOpen] = useState(false);
 
     useEffect(() => {
         getUsers().then(setAllUsers);
@@ -146,16 +147,46 @@ const Reports: React.FC = () => {
     ].filter(item => item.value > 0);
 
     const COLORS = ['#10B981', '#EF4444'];
+    
+    const handleShare = async () => {
+        const shareText = `Attendance Report for ${viewMode} on ${date}:\nPresent: ${stats.present}\nAbsent: ${stats.absent}\nTotal: ${stats.total}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Attendance Report - ${viewMode}`,
+                    text: shareText,
+                });
+            } catch (error) {
+                console.error('Error sharing:', error);
+            }
+        } else {
+            alert('Share functionality is not supported on your browser.');
+        }
+        setIsExportOpen(false);
+    };
 
     return (
         <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Daily Attendance Report</h3>
-                    <div className="flex gap-2">
-                        <button onClick={() => alert('Exporting to CSV...')} className="flex items-center gap-2 bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-700 transition-colors text-sm">
-                            <ExportIcon className="w-4 h-4" /> CSV
+                    <div className="relative">
+                         <button onClick={() => setIsExportOpen(!isExportOpen)} className="flex items-center gap-2 bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-700 transition-colors text-sm">
+                            <ExportIcon className="w-4 h-4" /> Export
                         </button>
+                        {isExportOpen && (
+                            <div onMouseLeave={() => setIsExportOpen(false)} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5">
+                                <a href="#" onClick={(e) => { e.preventDefault(); alert('Exporting to CSV...'); setIsExportOpen(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                    <ExportIcon className="w-4 h-4" /> Download CSV
+                                </a>
+                                <a href="#" onClick={(e) => { e.preventDefault(); alert('Exporting to PDF...'); setIsExportOpen(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                     <ExportIcon className="w-4 h-4" /> Download PDF
+                                </a>
+                                 <a href="#" onClick={(e) => { e.preventDefault(); handleShare(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                    <ShareIcon className="w-4 h-4" /> Share
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
 

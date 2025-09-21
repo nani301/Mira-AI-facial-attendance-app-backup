@@ -1,5 +1,6 @@
 
-import type { User, AttendanceRecord, Syllabus, Application, Result, Timetable, Feedback } from '../types';
+
+import type { User, AttendanceRecord, Syllabus, Application, Result, Timetable, Feedback, SubjectResult } from '../types';
 import { Role, AttendanceStatus, ApplicationType, ApplicationStatus } from '../types';
 
 // --- STATIC DATA AS PER REQUIREMENTS ---
@@ -11,16 +12,16 @@ const allStaffAndFaculty = [
     { id: 'hod_02', name: 'Dr. CH. VIDYA SAGAR', role: Role.HOD, branch: 'EC' },
     { id: 'hod_03', name: 'VANGALA INDIRA PRIYA DARSINI', role: Role.HOD, branch: 'MECH' },
     // Faculty
-    { id: 'fac_01', name: 'ARCOT VIDYA SAGAR', role: Role.FACULTY, branch: 'CS' },
+    { id: 'fac_01', name: 'ARCOT VIDYASAGAR', role: Role.FACULTY, branch: 'EC' }, // Matched from A.VIDYASAGAR
     { id: 'fac_02', name: 'J.ANAND KUMAR', role: Role.FACULTY, branch: 'EC' },
     { id: 'fac_03', name: 'B. SREE LAKSHMI', role: Role.FACULTY, branch: 'MECH' },
     { id: 'fac_04', name: 'BIDARUKOTA SHAKTHI KIRAN', role: Role.FACULTY, branch: 'IT' },
     { id: 'fac_05', name: 'HARESH NANDA', role: Role.FACULTY, branch: 'CS' },
     { id: 'fac_06', name: 'NAMBURU GOWTAMI', role: Role.FACULTY, branch: 'EC' },
-    { id: 'fac_07', name: 'B.GOPALA RAO', role: Role.FACULTY, branch: 'MECH' },
+    { id: 'fac_07', name: 'B.GOPALA RAO', role: Role.FACULTY, branch: 'EC' }, // Matched
     { id: 'fac_08', name: 'G.SADANANDAM', role: Role.FACULTY, branch: 'IT' },
-    { id: 'fac_09', name: 'TULLURI MANJOLA', role: Role.FACULTY, branch: 'EC' },
-    { id: 'fac_10', name: 'UMASHANKAR', role: Role.FACULTY, branch: 'IT' },
+    { id: 'fac_09', name: 'T.MANJULA', role: Role.FACULTY, branch: 'EC' }, // Matched
+    { id: 'fac_10', name: 'UMASHANKAR', role: Role.FACULTY, branch: 'EC' }, // Matched
     { id: 'fac_11', name: 'DONDILETI SRINIVASA REDDY', role: Role.FACULTY, branch: 'CS' },
     { id: 'fac_12', name: 'WASEEM RUKSANA', role: Role.FACULTY, branch: 'EC' },
     { id: 'fac_13', name: 'G.RAJSHEKHARA REDDY', role: Role.FACULTY, branch: 'MECH' },
@@ -93,6 +94,11 @@ const studentData = [
     { pin: '23210-EC-060', name: 'POCHARAM NAGESHWAR' },
     { pin: '23210-EC-061', name: 'GUNDA SRISHILAM' },
     { pin: '23210-EC-062', name: 'CHAKALI KRISHNA PRASAD' },
+    { pin: '23210-CS-001', name: 'ADAPA NIKHIL' },
+    { pin: '23210-CS-002', name: 'ARELLY VAMSHI' },
+    { pin: '23210-CS-003', name: 'BATHINI SHIVANI' },
+    { pin: '23210-CS-004', name: 'BOBBILI SHIVAKUMAR' },
+    { pin: '23210-CS-005', name: 'CHINTHAKINDI SHIREESHA' },
 ];
 
 let users: User[] = [
@@ -140,18 +146,27 @@ const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
 const attendanceRecords: AttendanceRecord[] = [];
 users.filter(u => u.role === Role.STUDENT).forEach(user => {
-    for (let i = 0; i < 30; i++) { // Generate for a month
+    // Each student gets a personalized, semi-random attendance probability
+    const attendanceProbability = 0.6 + Math.random() * 0.35; // Attendance between 60% and 95%
+    for (let i = 0; i < 90; i++) { // Generate for the last 3 months
         const date = new Date(today);
         date.setDate(today.getDate() - i);
-        if (date.getDay() === 0 || date.getDay() === 6) continue;
-        if (Math.random() > 0.25) { // 75% chance present
-            const late = Math.random() > 0.8;
+        if (date.getDay() === 0) continue; // No school on Sundays
+
+        const id = `att_${user.id}_${formatDate(date)}`;
+        
+        if (Math.random() < attendanceProbability) { // Student is present
+            const late = Math.random() > 0.9; // 10% chance of being late
             attendanceRecords.push({
-                id: `att_${user.id}_${formatDate(date)}`,
-                userId: user.id, userName: user.name, userPin: user.pin, date: formatDate(date),
+                id, userId: user.id, userName: user.name, userPin: user.pin, date: formatDate(date),
                 checkInTime: late ? `09:${Math.floor(Math.random()*30)+15}` : `08:${Math.floor(Math.random()*25)+30}`,
                 checkOutTime: `17:${Math.floor(Math.random()*30)}`,
                 status: late ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
+            });
+        } else { // Student is absent
+             attendanceRecords.push({
+                id, userId: user.id, userName: user.name, userPin: user.pin, date: formatDate(date),
+                checkInTime: null, checkOutTime: null, status: AttendanceStatus.ABSENT,
             });
         }
     }
@@ -169,6 +184,15 @@ users.filter(u => u.role === Role.FACULTY || u.role === Role.HOD).forEach(facult
 
 
 const syllabusData: Syllabus[] = [
+    { id: 'syl_me_501', branch: 'EC', subject: 'ME-501 Industrial Management & Enterpreneurship', file_url: '#', percent_completed: 85, uploaded_by: 'fac_09', uploaded_by_name: 'T.MANJULA', uploaded_at: '2025-09-15T10:00:00Z' },
+    { id: 'syl_ec_502', branch: 'EC', subject: 'EC-502 Industrial Electronics', file_url: '#', percent_completed: 92, uploaded_by: 'fac_01', uploaded_by_name: 'ARCOT VIDYASAGAR', uploaded_at: '2025-09-20T11:00:00Z' },
+    { id: 'syl_ec_503', branch: 'EC', subject: 'EC-503 Data Communication and Computer Networks', file_url: '#', percent_completed: 78, uploaded_by: 'fac_09', uploaded_by_name: 'T.MANJULA', uploaded_at: '2025-09-18T14:00:00Z' },
+    { id: 'syl_ec_574', branch: 'EC', subject: 'EC-574 Mobile & Optical Fibre Communication', file_url: '#', percent_completed: 65, uploaded_by: 'fac_07', uploaded_by_name: 'B.GOPALA RAO', uploaded_at: '2025-09-12T09:30:00Z' },
+    { id: 'syl_ec_585', branch: 'EC', subject: 'EC-585 Digital Circuit Design using Verilog VHDL', file_url: '#', percent_completed: 95, uploaded_by: 'fac_10', uploaded_by_name: 'UMASHANKAR', uploaded_at: '2025-09-22T16:00:00Z' },
+    { id: 'syl_cs_517', branch: 'EC', subject: 'CS-517 Computer Hardware & Networking Lab', file_url: '#', percent_completed: 100, uploaded_by: 'fac_09', uploaded_by_name: 'T.MANJULA', uploaded_at: '2025-09-25T13:00:00Z' },
+    { id: 'syl_ec_506', branch: 'EC', subject: 'EC-506 Industrial Electronics Lab', file_url: '#', percent_completed: 88, uploaded_by: 'fac_01', uploaded_by_name: 'ARCOT VIDYASAGAR', uploaded_at: '2025-09-21T15:00:00Z' },
+    { id: 'syl_ec_508', branch: 'EC', subject: 'EC-508 LabView', file_url: '#', percent_completed: 70, uploaded_by: 'fac_07', uploaded_by_name: 'B.GOPALA RAO', uploaded_at: '2025-09-19T12:00:00Z' },
+    { id: 'syl_ec_509', branch: 'EC', subject: 'EC-509 Digital Circuit Design using Verilog HDL', file_url: '#', percent_completed: 45, uploaded_by: 'fac_10', uploaded_by_name: 'UMASHANKAR', uploaded_at: '2025-09-24T10:00:00Z' },
     { id: 'syl_cs_01', branch: 'CS', subject: 'Data Structures', file_url: '#', percent_completed: 90, uploaded_by: 'hod_01', uploaded_by_name: 'Dr. S.N PADMAVATHI', uploaded_at: '2023-10-21T10:00:00Z' },
     { id: 'syl_it_01', branch: 'IT', subject: 'Web Technologies', file_url: '#', percent_completed: 75, uploaded_by: 'fac_04', uploaded_by_name: 'BIDARUKOTA SHAKTHI KIRAN', uploaded_at: '2023-10-20T14:30:00Z' },
 ];
@@ -178,19 +202,68 @@ let applications: Application[] = [
     { id: 'app_02', user_id: users.find(u => u.pin === '23210-EC-010')?.id || '', pin: '23210-EC-010', type: ApplicationType.BONAFIDE, status: ApplicationStatus.APPROVED, payload: { reason: 'Passport application' }, created_at: '2023-10-28T11:00:00Z', decided_at: '2023-10-29T15:00:00Z' },
 ];
 
-const resultsData: Result[] = [];
+const generateStudentResult = (student: User, subjects: { code: string, name: string }[]): Result => {
+    let backlogs = 0;
+    let totalGradePoints = 0;
+    const subjectResults: SubjectResult[] = subjects.map(s => {
+        const marks = 25 + Math.floor(Math.random() * 76); // Marks between 25 and 100
+        const passed = marks >= 35;
+        if (!passed) {
+            backlogs++;
+            totalGradePoints += 0;
+        } else {
+            totalGradePoints += Math.floor(marks / 10);
+        }
+        return { subjectCode: s.code, subjectName: s.name, marks, passed };
+    });
+    const sgpa = parseFloat((totalGradePoints / subjects.length).toFixed(2));
+    return {
+        id: `res_${student.id}`, pin: student.pin, userName: student.name,
+        branch: student.branch, semester: 5, sgpa: Math.max(0, sgpa),
+        backlogs, subjects: subjectResults
+    };
+};
+
+const ecSubjects = [
+    { code: 'ME-501', name: "Industrial Management & Enterpreneurship" }, { code: 'EC-502', name: "Industrial Electronics" },
+    { code: 'EC-503', name: "Data Communication and Computer Networks" }, { code: 'EC-574', name: "Mobile & Optical Fibre Communication" },
+    { code: 'EC-585', name: "Digital Circuit Design using Verilog VHDL" }
+];
+const csSubjects = [
+    { code: 'CS-501', name: "Operating Systems" }, { code: 'CS-502', name: "Database Management" },
+    { code: 'CS-503', name: "Software Engineering" }, { code: 'CS-504', name: "Web Technologies" }
+];
+
+const resultsData: Result[] = users
+    .filter(u => u.role === Role.STUDENT)
+    .map(student => {
+        if (student.branch === 'EC') return generateStudentResult(student, ecSubjects);
+        if (student.branch === 'CS') return generateStudentResult(student, csSubjects);
+        return null;
+    }).filter((r): r is Result => r !== null);
+
+
 const timetables: Timetable[] = [];
 const feedback: Feedback[] = [];
+
+// --- Academic Constants ---
+const ACADEMIC_CONSTANTS = {
+    totalWorkingDays: 120,
+    requiredAttendancePercentage: 75,
+};
 
 // --- API SIMULATION ---
 const simulateDelay = <T>(data: T, delay = 300): Promise<T> => new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
 
+// --- CONSTANTS API ---
+export const getAcademicConstants = () => simulateDelay(ACADEMIC_CONSTANTS);
+
 // --- AUTH ---
 let authenticatedUserId = 'hod_02'; // Default to Dr. CH. VIDYA SAGAR
-export const getAuthenticatedUser = () => simulateDelay(users.find(u => u.id === authenticatedUserId));
+export const getAuthenticatedUser = () => simulateDelay(users.find(u => u.id === authenticatedUserId) || null);
 export const setAuthenticatedUser = (userId: string) => {
     authenticatedUserId = userId;
-    return simulateDelay(users.find(u => u.id === userId));
+    return simulateDelay(users.find(u => u.id === userId) || null);
 }
 export const getAllFaculty = () => simulateDelay(users.filter(u => u.role === Role.FACULTY || u.role === Role.HOD || u.role === Role.PRINCIPAL));
 
@@ -199,8 +272,8 @@ export const getDashboardStats = (date: string) => {
     const dailyRecords = attendanceRecords.filter(r => r.date === date && r.userPin.startsWith('23')); // Only students
     const totalStudents = users.filter(u => u.role === Role.STUDENT).length;
     return simulateDelay({
-        present: dailyRecords.length,
-        absent: totalStudents - dailyRecords.length,
+        present: dailyRecords.filter(r => r.status !== AttendanceStatus.ABSENT).length,
+        absent: totalStudents - dailyRecords.filter(r => r.status !== AttendanceStatus.ABSENT).length,
         total: totalStudents,
     });
 };
@@ -221,24 +294,45 @@ export const getAttendanceByDateAndBranch = (date: string, branch: string) => {
 // --- ATTENDANCE LOG ---
 export const getUserByDetails = ({ year, collegeCode, branch, roll }: { year: number, collegeCode: string, branch: string, roll: string}) => {
     const pin = `${year}${collegeCode}-${branch}-${roll.padStart(3, '0')}`;
-    return simulateDelay(users.find(u => u.pin === pin));
+    return simulateDelay(users.find(u => u.pin === pin) || null);
 };
 
 export const markAttendance = (userId: string, coords: {lat: number, lng: number}) => {
     const date = formatDate(new Date());
     const existing = attendanceRecords.find(r => r.userId === userId && r.date === date);
     const user = users.find(u => u.id === userId);
-    if (existing || !user) return simulateDelay({ success: false });
+    
+    // Check if attendance was already marked as present or late today
+    if (existing && existing.status !== AttendanceStatus.ABSENT) {
+        return simulateDelay({ success: false, message: `Attendance already marked today at ${existing.checkInTime}.` });
+    }
+    
+    if (!user) return simulateDelay({ success: false, message: "User not found." });
 
-    attendanceRecords.unshift({
-        id: `att_${userId}_${date}`,
-        userId, userName: user.name, userPin: user.pin, date,
-        checkInTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-        checkOutTime: null, status: AttendanceStatus.PRESENT,
-        coordinate: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
-    });
+    // If an "absent" record exists, update it. Otherwise, create a new record.
+    if (existing && existing.status === AttendanceStatus.ABSENT) {
+        existing.status = AttendanceStatus.PRESENT;
+        existing.checkInTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        existing.coordinate = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+    } else {
+        attendanceRecords.unshift({
+            id: `att_${userId}_${date}`,
+            userId, userName: user.name, userPin: user.pin, date,
+            checkInTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            checkOutTime: null, status: AttendanceStatus.PRESENT,
+            coordinate: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+        });
+    }
+
     return simulateDelay({ success: true });
 };
+
+export const checkTodaysAttendance = (userId: string) => {
+    const date = formatDate(new Date());
+    const existing = attendanceRecords.find(r => r.userId === userId && r.date === date && r.status !== AttendanceStatus.ABSENT);
+    return simulateDelay(existing || null);
+};
+
 
 export const sendEmail = (payload: {to: string, cc?: string, subject: string}) => {
     console.log("Simulating email send:", payload);
@@ -259,7 +353,7 @@ export const updateUser = (userId: string, updates: Partial<User>) => {
     if(user) {
         Object.assign(user, updates);
     }
-    return simulateDelay(user);
+    return simulateDelay(user || null);
 }
 export const deleteUser = (userId: string) => {
     users = users.filter(u => u.id !== userId);
@@ -277,6 +371,9 @@ export const verifyOtp = (email: string, otp: string) => {
 export const updateUserProfile = (userId: string, updates: Partial<User>) => {
     return updateUser(userId, updates);
 }
+
+// --- SYLLABUS ---
+export const getSyllabusData = () => simulateDelay(syllabusData);
 
 // --- APPLICATIONS ---
 export const submitApplication = (appData: {pin: string, type: ApplicationType, payload: any}): Promise<Application> => {
@@ -305,3 +402,24 @@ export const getApplicationsByUserId = (userId: string) => {
 export const getUserByPin = (pin: string) => {
     return simulateDelay(users.find(u => u.pin === pin) || null);
 };
+
+// --- SBTET RESULTS ---
+export const getSbtetResults = (user: User | null): Promise<Result[]> => {
+    if (!user) return simulateDelay([]);
+
+    if (user.role === Role.PRINCIPAL) {
+        return simulateDelay(resultsData);
+    }
+    if (user.role === Role.HOD) {
+        return simulateDelay(resultsData.filter(r => r.branch === user.branch));
+    }
+    if (user.role === Role.FACULTY) {
+        // Faculty sees results for their entire branch to analyze their subjects' performance
+        return simulateDelay(resultsData.filter(r => r.branch === user.branch));
+    }
+    if (user.role === Role.STUDENT) {
+        return simulateDelay(resultsData.filter(r => r.pin === user.pin));
+    }
+    return simulateDelay([]);
+};
+export const getSyllabus = () => simulateDelay(syllabusData);

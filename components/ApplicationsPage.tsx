@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import type { Application, User } from '../types';
 import { Role, ApplicationType, ApplicationStatus } from '../types';
 import { submitApplication, getApplicationsByPin, getApplicationsByUserId, getUserByPin } from '../services/mockApiService';
-import { ApplicationIcon, UploadIcon, DownloadIcon } from './Icons';
+import { ApplicationIcon, UploadIcon, DownloadIcon, ShareIcon } from './Icons';
 
 // --- Shared Components & Utilities ---
 const inputClasses = "mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500";
@@ -184,6 +184,22 @@ const StatusChecker: React.FC = () => {
         setResults(apps);
         setIsLoading(false);
     };
+    
+    const handleShare = async (app: Application) => {
+        const shareText = `Application Status for ${pin}:\nType: ${app.type}\nReason: ${app.payload.reason || app.payload.purpose}\nStatus: ${app.status}`;
+        if(navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Application Status: ${app.type}`,
+                    text: shareText,
+                });
+            } catch (error) {
+                console.error("Error sharing application", error);
+            }
+        } else {
+            alert("Share feature not available on this browser.");
+        }
+    };
 
     return (
         <div className="space-y-4">
@@ -206,9 +222,14 @@ const StatusChecker: React.FC = () => {
                            <div className="flex items-center gap-4 mt-2 sm:mt-0">
                                 <span className={getStatusChip(app.status)}>{app.status}</span>
                                 {app.status === ApplicationStatus.APPROVED && (app.type === ApplicationType.BONAFIDE || app.type === ApplicationType.TC) && (
-                                    <button onClick={() => alert(`Downloading ${app.type} PDF...`)} className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-                                        <DownloadIcon className="w-4 h-4" /> Download PDF
-                                    </button>
+                                    <>
+                                        <button onClick={() => alert(`Downloading ${app.type} PDF...`)} className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            <DownloadIcon className="w-4 h-4" /> Download
+                                        </button>
+                                         <button onClick={() => handleShare(app)} className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            <ShareIcon className="w-4 h-4" /> Share
+                                        </button>
+                                    </>
                                 )}
                            </div>
                         </li>
@@ -273,6 +294,22 @@ const StudentView: React.FC<{ user: User }> = ({ user }) => {
     const handleApplicationSubmitted = (app: Application) => {
         alert(`${app.type} application submitted! Your request is now pending.`);
         fetchApplications(); // Refresh list
+    };
+
+    const handleShare = async (app: Application) => {
+        const shareText = `My Application Status:\nType: ${app.type}\nReason: ${app.payload.reason || app.payload.purpose}\nStatus: ${app.status}`;
+        if(navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Application Status: ${app.type}`,
+                    text: shareText,
+                });
+            } catch (error) {
+                console.error("Error sharing application", error);
+            }
+        } else {
+            alert("Share feature not available on this browser.");
+        }
     };
     
     const StudentLeaveForm: React.FC = () => {
@@ -378,12 +415,24 @@ const StudentView: React.FC<{ user: User }> = ({ user }) => {
                 <h3 className="text-lg font-semibold mb-4">Your Past Applications</h3>
                 <ul className="space-y-3">
                     {applications.filter(a => a.type === (activeTab === 'leave' ? ApplicationType.LEAVE : ApplicationType.BONAFIDE)).map(app => (
-                        <li key={app.id} className="p-4 border rounded-lg flex justify-between items-center dark:border-slate-700">
-                           <div>
+                         <li key={app.id} className="p-4 border rounded-lg flex flex-col sm:flex-row justify-between sm:items-center dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                           <div className="flex-grow">
                                 <p className="font-semibold">{app.payload.reason || app.payload.purpose}</p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Applied on {new Date(app.created_at).toLocaleDateString()}</p>
                            </div>
-                           <span className={getStatusChip(app.status)}>{app.status}</span>
+                           <div className="flex items-center gap-4 mt-2 sm:mt-0">
+                               <span className={getStatusChip(app.status)}>{app.status}</span>
+                                {app.status === ApplicationStatus.APPROVED && (app.type === ApplicationType.BONAFIDE || app.type === ApplicationType.TC) && (
+                                    <>
+                                        <button onClick={() => alert(`Downloading ${app.type} PDF...`)} className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            <DownloadIcon className="w-4 h-4" /> Download
+                                        </button>
+                                        <button onClick={() => handleShare(app)} className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            <ShareIcon className="w-4 h-4" /> Share
+                                        </button>
+                                    </>
+                                )}
+                           </div>
                         </li>
                     ))}
                      {applications.filter(a => a.type === (activeTab === 'leave' ? ApplicationType.LEAVE : ApplicationType.BONAFIDE)).length === 0 && (

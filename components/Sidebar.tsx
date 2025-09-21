@@ -8,6 +8,7 @@ type SidebarProps = {
   onClose: () => void;
   currentPage: Page;
   setCurrentPage: (page: Page) => void;
+  onLogout: () => void;
 };
 
 const NavItem: React.FC<{
@@ -34,7 +35,7 @@ const NavItem: React.FC<{
   );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurrentPage }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurrentPage, onLogout }) => {
   const navItems = [
     { page: 'dashboard' as Page, label: 'Dashboard', icon: <DashboardIcon className="w-6 h-6" /> },
     { page: 'reports' as Page, label: 'Reports', icon: <ReportIcon className="w-6 h-6" /> },
@@ -108,13 +109,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurr
       </nav>
       <div>
         <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-         <a
-              href="#"
-              className="flex items-center p-3 my-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100 transition-all duration-200"
-            >
-              <LogoutIcon className="w-6 h-6" />
-              <span className="ml-4 font-medium">Logout</span>
-            </a>
+         <button
+            onClick={onLogout}
+            className="w-full text-left flex items-center p-3 my-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100 transition-all duration-200"
+          >
+            <LogoutIcon className="w-6 h-6" />
+            <span className="ml-4 font-medium">Logout</span>
+          </button>
       </div>
     </aside>
   );

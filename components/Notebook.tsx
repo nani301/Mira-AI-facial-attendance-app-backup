@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { 
     LightbulbIcon, QuestionMarkCircleIcon, PresentationChartBarIcon, BookOpenIcon, 
     ShareIcon, BeakerIcon, ArrowLeftIcon, SparklesIcon, DownloadIcon 
-} from './Icons';
-import * as geminiService from '../services/geminiService';
-import type { PptSlide, QuizQuestion } from '../types';
+} from './Icons.tsx';
+import * as geminiService from '../services/geminiService.ts';
+import type { PptSlide, QuizQuestion } from '../types.ts';
 
 type View = 'hub' | 'summary' | 'exam' | 'ppt' | 'story' | 'mindmap' | 'quiz';
 
@@ -214,6 +214,51 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
             }
         }
     };
+    
+     const handleShare = async () => {
+        if (!output) return;
+
+        let shareText = `Notebook LLM Output: ${feature.title}\n\n`;
+
+        if (feature.outputType === 'text' || feature.outputType === 'mindmap') {
+            shareText += output;
+        } else if (feature.outputType === 'ppt') {
+            (output.slides as PptSlide[]).forEach((slide, slideIndex) => {
+                shareText += `Slide ${slideIndex + 1}: ${slide.title}\n`;
+                slide.points.forEach((point) => {
+                    shareText += `- ${point}\n`;
+                });
+                if (slide.notes) {
+                    shareText += `Notes: ${slide.notes}\n`;
+                }
+                shareText += '\n';
+            });
+        } else if (feature.outputType === 'quiz') {
+            (output.questions as QuizQuestion[]).forEach((q, index) => {
+                shareText += `${index + 1}. ${q.question} (${q.type})\n`;
+                if (q.options) {
+                    shareText += q.options.join('\n');
+                    shareText += '\n';
+                }
+                shareText += `Answer: ${q.answer}\n\n`;
+            });
+        }
+
+        const shareData = {
+            title: feature.title,
+            text: shareText,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.error("Share failed:", err);
+            }
+        } else {
+            alert("Share feature is not supported on your browser.");
+        }
+    };
 
     const handleGenerate = async () => {
         if (!inputText) return;
@@ -285,6 +330,9 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
                                 </button>
                                 <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
                                     <DownloadIcon className="w-4 h-4" /> PDF
+                                </button>
+                                <button onClick={handleShare} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
+                                    <ShareIcon className="w-4 h-4" /> Share
                                 </button>
                             </div>
                         )}

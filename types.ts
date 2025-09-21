@@ -83,6 +83,13 @@ export interface Application {
     decided_at?: string;
 }
 
+export interface SubjectResult {
+  subjectCode: string;
+  subjectName: string;
+  marks: number;
+  passed: boolean;
+}
+
 export interface Result {
     id: string;
     pin: string;
@@ -91,6 +98,7 @@ export interface Result {
     semester: number;
     sgpa: number;
     backlogs: number;
+    subjects: SubjectResult[];
 }
 
 export interface Timetable {

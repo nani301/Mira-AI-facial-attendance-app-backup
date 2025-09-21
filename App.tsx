@@ -78,6 +78,11 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
     };
 
+    const handleLogout = () => {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+    };
+
     const toggleTheme = () => {
         setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
     };
@@ -126,6 +131,7 @@ const App: React.FC = () => {
                 onClose={() => setTheme('light')} // Closing the sidebar means switching to light theme
                 currentPage={currentPage}
                 setCurrentPage={handlePageChange}
+                onLogout={handleLogout}
             />
 
             {isSidebarOpen && (
