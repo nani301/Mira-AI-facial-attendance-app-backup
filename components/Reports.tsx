@@ -213,8 +213,9 @@ const Reports: React.FC = () => {
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
-                                // FIX: The 'percent' property from recharts can be undefined, causing a TypeError on multiplication. Added a fallback to 0 to prevent the error.
-                                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                // FIX: The 'percent' property from recharts can be undefined, a different type, or NaN.
+                                // Explicitly convert to a number and use a fallback to ensure a valid numeric value for the arithmetic operation.
+                                label={({ name, percent }) => `${name} ${((Number(percent) || 0) * 100).toFixed(0)}%`}
                             >
                                 {pieData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
