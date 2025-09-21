@@ -3,8 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { AttendanceRecord, PptContent, QuizContent } from '../types';
 
 // IMPORTANT: This key is managed externally. Do not hardcode or expose it.
-// It is assumed to be available in the environment variables.
-const API_KEY = process.env.API_KEY;
+// For frontend frameworks like Vite (used by Vercel and other platforms),
+// environment variables must be prefixed with VITE_ and accessed via import.meta.env.
+const API_KEY = (import.meta as any)?.env?.VITE_API_KEY;
 
 let ai: GoogleGenAI | null = null;
 

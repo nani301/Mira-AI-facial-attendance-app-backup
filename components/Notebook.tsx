@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
     LightbulbIcon, QuestionMarkCircleIcon, PresentationChartBarIcon, BookOpenIcon, 
@@ -348,6 +349,24 @@ const Notebook: React.FC = () => {
     const isGeminiConfigured = geminiService.isAiAvailable();
     
     if (!isGeminiConfigured) {
+        const isBuildEnvMissing = typeof import.meta?.env === 'undefined';
+        const isApiKeyMissing = !isBuildEnvMissing && !(import.meta as any).env.VITE_API_KEY;
+
+        let errorTitle = "AI Features Disabled";
+        let errorMessage = `The Gemini API key has not been configured for this deployment. To enable the Notebook LLM, an administrator must set the <code>VITE_API_KEY</code> environment variable in the Vercel project settings and redeploy the application.`;
+
+        if (isBuildEnvMissing) {
+            errorTitle = "Project Configuration Error";
+            errorMessage = `The application's build environment is not being detected (<code>import.meta.env</code> is missing). This typically occurs when the deployment service (like Vercel) isn't building the project as a Vite application.
+            <br/><br/>
+            <strong>To fix:</strong> In your Vercel project settings, go to the "General" section and ensure the "Framework Preset" is set to "<strong>Vite</strong>". Then, redeploy your application.`;
+        } else if (isApiKeyMissing) {
+            errorTitle = "API Key Not Found";
+            errorMessage = `The application's build environment was detected, but the <code>VITE_API_KEY</code> was not found within it.
+            <br/><br/>
+            <strong>To fix:</strong> Please go to your Vercel project's "Settings" &rarr; "Environment Variables" and ensure a variable named exactly <strong>VITE_API_KEY</strong> exists and is enabled for the correct environments (Production, Preview).`;
+        }
+
         return (
             <div className="h-full bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden p-8 flex flex-col items-center justify-center text-center">
                  <div className="bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-full p-4 mb-4">
@@ -355,10 +374,11 @@ const Notebook: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                     </svg>
                  </div>
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Features Disabled</h1>
-                <p className="mt-2 max-w-md text-slate-600 dark:text-slate-400">
-                    The Gemini API key has not been configured for this deployment. To enable the Notebook LLM, an administrator must set the <code>API_KEY</code> environment variable in the Vercel project settings and redeploy the application.
-                </p>
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{errorTitle}</h1>
+                 <p 
+                    className="mt-2 max-w-lg text-slate-600 dark:text-slate-400 text-left"
+                    dangerouslySetInnerHTML={{ __html: errorMessage }}
+                />
             </div>
         );
     }
