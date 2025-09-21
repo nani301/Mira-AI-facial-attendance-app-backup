@@ -121,7 +121,7 @@ const Reports: React.FC = () => {
     const { usersForView, filteredUsers, isFacultyView } = useMemo(() => {
         const facultyView = viewMode === 'FACULTY';
         const users = allUsers.filter(u => {
-            if (facultyView) return u.role === Role.FACULTY || u.role === Role.PRINCIPAL;
+            if (facultyView) return u.role === Role.FACULTY || u.role === Role.PRINCIPAL || u.role === Role.HOD;
             return u.role === Role.STUDENT && u.branch === viewMode;
         });
         

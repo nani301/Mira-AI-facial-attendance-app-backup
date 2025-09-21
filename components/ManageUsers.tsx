@@ -139,7 +139,7 @@ const ManageUsers: React.FC<{ user: User | null }> = ({ user: authenticatedUser 
 
     const { faculty, staff, students } = useMemo(() => {
         return {
-            faculty: allUsers.filter(u => u.role === Role.FACULTY),
+            faculty: allUsers.filter(u => u.role === Role.PRINCIPAL || u.role === Role.HOD || u.role === Role.FACULTY),
             staff: allUsers.filter(u => u.role === Role.STAFF),
             students: allUsers.filter(u => u.role === Role.STUDENT)
         };
@@ -147,7 +147,7 @@ const ManageUsers: React.FC<{ user: User | null }> = ({ user: authenticatedUser 
 
     // Role-based access control logic
     const canManageFacultyOrStaff = authenticatedUser?.role === Role.PRINCIPAL;
-    const canManageStudents = authenticatedUser?.role === Role.PRINCIPAL || authenticatedUser?.role === Role.FACULTY;
+    const canManageStudents = authenticatedUser?.role === Role.PRINCIPAL || authenticatedUser?.role === Role.FACULTY || authenticatedUser?.role === Role.HOD;
 
     const handleAction = (action: 'add' | 'edit' | 'delete', userToManage: User | null, requiresAuth: boolean) => {
         if (requiresAuth) {
@@ -184,7 +184,7 @@ const ManageUsers: React.FC<{ user: User | null }> = ({ user: authenticatedUser 
         <>
             <div className="space-y-8">
                 <UserTable 
-                    title="Faculty" 
+                    title="Leadership & Faculty" 
                     users={faculty} 
                     canManage={canManageFacultyOrStaff}
                     onAdd={() => handleAction('add', null, true)}
@@ -243,7 +243,7 @@ const UserTable: React.FC<{
             <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
             {canManage && (
                 <button onClick={onAdd} className="font-bold py-2 px-4 rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-2">
-                    <PlusIcon className="w-5 h-5" /> Add New {title.slice(0, -1)}
+                    <PlusIcon className="w-5 h-5" /> Add New {title.split(' ')[0].slice(0, -1)}
                 </button>
             )}
         </div>
@@ -252,6 +252,7 @@ const UserTable: React.FC<{
                 <thead className="bg-slate-50 dark:bg-slate-700">
                     <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Name / PIN</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Role</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Department/Branch</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Email Verified</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider text-right">Actions</th>
@@ -271,6 +272,7 @@ const UserTable: React.FC<{
                                     </div>
                                 </div>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{user.role}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{user.branch}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.email_verified ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>

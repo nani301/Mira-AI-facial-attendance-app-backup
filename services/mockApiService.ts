@@ -3,20 +3,39 @@ import type { User, AttendanceRecord, Syllabus, Application, Result, Timetable, 
 import { Role, AttendanceStatus, ApplicationType, ApplicationStatus } from '../types';
 
 // --- STATIC DATA AS PER REQUIREMENTS ---
-const principalData = [
-    { id: 'princ_01', name: 'Dr. S. Radhika', branch: 'ADMIN' },
-];
-
-const facultyData = [
-    { id: 'fac_01', name: 'Vidya Sagar', branch: 'CS' },
-    { id: 'fac_02', name: 'T. Manjula', branch: 'EC' },
-    { id: 'fac_03', name: 'B. Gopala Rao', branch: 'MECH' },
-    { id: 'fac_04', name: 'Uma Shankar', branch: 'IT' },
-];
-
-const staffData = [
-    { id: 'staff_01', name: 'K. Ramesh', branch: 'Office' },
-    { id: 'staff_02', name: 'L. Sunitha', branch: 'Library' },
+const allStaffAndFaculty = [
+    // Principal
+    { id: 'princ_01', name: 'P. JANAKI DEVI', role: Role.PRINCIPAL, branch: 'ADMIN' },
+    // HODs
+    { id: 'hod_01', name: 'Dr. S.N PADMAVATHI', role: Role.HOD, branch: 'CS' },
+    { id: 'hod_02', name: 'Dr. CH. VIDYA SAGAR', role: Role.HOD, branch: 'EC' },
+    { id: 'hod_03', name: 'VANGALA INDIRA PRIYA DARSINI', role: Role.HOD, branch: 'MECH' },
+    // Faculty
+    { id: 'fac_01', name: 'ARCOT VIDYA SAGAR', role: Role.FACULTY, branch: 'CS' },
+    { id: 'fac_02', name: 'J.ANAND KUMAR', role: Role.FACULTY, branch: 'EC' },
+    { id: 'fac_03', name: 'B. SREE LAKSHMI', role: Role.FACULTY, branch: 'MECH' },
+    { id: 'fac_04', name: 'BIDARUKOTA SHAKTHI KIRAN', role: Role.FACULTY, branch: 'IT' },
+    { id: 'fac_05', name: 'HARESH NANDA', role: Role.FACULTY, branch: 'CS' },
+    { id: 'fac_06', name: 'NAMBURU GOWTAMI', role: Role.FACULTY, branch: 'EC' },
+    { id: 'fac_07', name: 'B.GOPALA RAO', role: Role.FACULTY, branch: 'MECH' },
+    { id: 'fac_08', name: 'G.SADANANDAM', role: Role.FACULTY, branch: 'IT' },
+    { id: 'fac_09', name: 'TULLURI MANJOLA', role: Role.FACULTY, branch: 'EC' },
+    { id: 'fac_10', name: 'UMASHANKAR', role: Role.FACULTY, branch: 'IT' },
+    { id: 'fac_11', name: 'DONDILETI SRINIVASA REDDY', role: Role.FACULTY, branch: 'CS' },
+    { id: 'fac_12', name: 'WASEEM RUKSANA', role: Role.FACULTY, branch: 'EC' },
+    { id: 'fac_13', name: 'G.RAJSHEKHARA REDDY', role: Role.FACULTY, branch: 'MECH' },
+    // Staff
+    { id: 'staff_01', name: 'G.VENKAT REDDY', role: Role.STAFF, branch: 'Library' }, // Librarian
+    { id: 'staff_02', name: 'D. SUBRAMANYAM', role: Role.STAFF, branch: 'Labs' }, // Senior Instructor
+    { id: 'staff_03', name: 'B. SRINIVAS GOUD', role: Role.STAFF, branch: 'Labs' }, // Lab Attender
+    { id: 'staff_04', name: 'AFROZE JABEEN', role: Role.STAFF, branch: 'Office' }, // Admin Officer
+    { id: 'staff_05', name: 'C.SATYAVATHI', role: Role.STAFF, branch: 'Office' }, // Office Superintendent
+    { id: 'staff_06', name: 'MANDALA LAXMI DEVI', role: Role.STAFF, branch: 'Office' }, // Senior Assistant
+    { id: 'staff_07', name: 'G.V.BABITHA', role: Role.STAFF, branch: 'Office' }, // Senior Assistant
+    { id: 'staff_08', name: 'MATHANGI JAGDESHWAR RAO', role: Role.STAFF, branch: 'Office' }, // Junior Assistant
+    { id: 'staff_09', name: 'K. SAILU', role: Role.STAFF, branch: 'Office' }, // Junior Assistant
+    { id: 'staff_10', name: 'NAYAKOTI SUPRIYA', role: Role.STAFF, branch: 'Office' }, // Junior Assistant
+    { id: 'staff_11', name: 'YERRAGOLLA NARSIMLU', role: Role.STAFF, branch: 'Office' }, // Office Subordinate
 ];
 
 const studentData = [
@@ -77,40 +96,23 @@ const studentData = [
 ];
 
 let users: User[] = [
-    ...principalData.map(p => ({
-        ...p,
-        role: Role.PRINCIPAL,
-        pin: `PRINCIPAL-01`,
-        year: 0,
-        college_code: '210',
-        email: `${p.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@mira.edu`,
-        email_verified: true,
-        parent_email_verified: false,
-        imageUrl: `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(p.name)}&backgroundColor=b6e3f4`,
-    })),
-    ...facultyData.map(f => ({
-        ...f,
-        role: Role.FACULTY,
-        pin: `FAC-${f.id.split('_')[1]}`,
-        year: 0,
-        college_code: '210',
-        email: `${f.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@mira.edu`,
-        email_verified: true,
-        parent_email_verified: false,
-        imageUrl: `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(f.name)}&backgroundColor=c0aede`,
-    })),
-     ...staffData.map((s, i) => ({
-        ...s,
-        id: `staff_${(i+1).toString().padStart(2, '0')}`,
-        role: Role.STAFF,
-        pin: `STAFF-0${i+1}`,
-        year: 0,
-        college_code: '210',
-        email: `${s.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@mira.edu`,
-        email_verified: true,
-        parent_email_verified: false,
-        imageUrl: `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(s.name)}&backgroundColor=ffd5a1`,
-    })),
+    ...allStaffAndFaculty.map(p => {
+        const pin = `${p.role.toUpperCase()}-${p.id.split('_')[1]}`;
+        const backgroundColor = 
+            p.role === Role.PRINCIPAL ? 'b6e3f4' : 
+            p.role === Role.HOD ? 'a78bfa' : 
+            p.role === Role.FACULTY ? 'c0aede' : 'ffd5a1';
+        return {
+            ...p,
+            pin: pin,
+            year: 0,
+            college_code: '210',
+            email: `${p.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@mira.edu`,
+            email_verified: true,
+            parent_email_verified: false,
+            imageUrl: `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(p.name)}&backgroundColor=${backgroundColor}`,
+        };
+    }),
     ...studentData.map((s, i) => {
         const pinParts = s.pin.split('-'); // e.g., ['23210', 'EC', '004']
         return {
@@ -155,7 +157,7 @@ users.filter(u => u.role === Role.STUDENT).forEach(user => {
     }
 });
 // Add mock attendance for faculty on the current date
-users.filter(u => u.role === Role.FACULTY).forEach(faculty => {
+users.filter(u => u.role === Role.FACULTY || u.role === Role.HOD).forEach(faculty => {
     if (Math.random() > 0.1) { // 90% chance present
         attendanceRecords.unshift({
             id: `att_${faculty.id}_${formatDate(today)}`,
@@ -167,8 +169,8 @@ users.filter(u => u.role === Role.FACULTY).forEach(faculty => {
 
 
 const syllabusData: Syllabus[] = [
-    { id: 'syl_cs_01', branch: 'CS', subject: 'Data Structures', file_url: '#', percent_completed: 90, uploaded_by: 'fac_01', uploaded_by_name: 'Vidya Sagar', uploaded_at: '2023-10-21T10:00:00Z' },
-    { id: 'syl_it_01', branch: 'IT', subject: 'Web Technologies', file_url: '#', percent_completed: 75, uploaded_by: 'fac_04', uploaded_by_name: 'Uma Shankar', uploaded_at: '2023-10-20T14:30:00Z' },
+    { id: 'syl_cs_01', branch: 'CS', subject: 'Data Structures', file_url: '#', percent_completed: 90, uploaded_by: 'hod_01', uploaded_by_name: 'Dr. S.N PADMAVATHI', uploaded_at: '2023-10-21T10:00:00Z' },
+    { id: 'syl_it_01', branch: 'IT', subject: 'Web Technologies', file_url: '#', percent_completed: 75, uploaded_by: 'fac_04', uploaded_by_name: 'BIDARUKOTA SHAKTHI KIRAN', uploaded_at: '2023-10-20T14:30:00Z' },
 ];
 
 let applications: Application[] = [
@@ -184,13 +186,13 @@ const feedback: Feedback[] = [];
 const simulateDelay = <T>(data: T, delay = 300): Promise<T> => new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
 
 // --- AUTH ---
-let authenticatedUserId = 'fac_01';
+let authenticatedUserId = 'hod_02'; // Default to Dr. CH. VIDYA SAGAR
 export const getAuthenticatedUser = () => simulateDelay(users.find(u => u.id === authenticatedUserId));
 export const setAuthenticatedUser = (userId: string) => {
     authenticatedUserId = userId;
     return simulateDelay(users.find(u => u.id === userId));
 }
-export const getAllFaculty = () => simulateDelay(users.filter(u => u.role === Role.FACULTY));
+export const getAllFaculty = () => simulateDelay(users.filter(u => u.role === Role.FACULTY || u.role === Role.HOD || u.role === Role.PRINCIPAL));
 
 // --- DASHBOARD ---
 export const getDashboardStats = (date: string) => {
@@ -210,7 +212,7 @@ export const getAttendanceByDateAndBranch = (date: string, branch: string) => {
         if (r.date !== date) return false;
         const user = users.find(u => u.id === r.userId);
         if (!user) return false;
-        if (isFaculty) return user.role === Role.FACULTY || user.role === Role.PRINCIPAL;
+        if (isFaculty) return user.role === Role.FACULTY || user.role === Role.PRINCIPAL || user.role === Role.HOD;
         return user.branch === branch;
     });
     return simulateDelay(records);
