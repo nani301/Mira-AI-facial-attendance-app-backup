@@ -213,7 +213,7 @@ const Reports: React.FC = () => {
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
-                                // FIX: The 'percent' property from recharts can be undefined. Using logical OR (||) provides a default value of 0 to prevent a TypeError during multiplication.
+                                // FIX: The 'percent' property from recharts can be undefined, causing a TypeError on multiplication. Added a fallback to 0 to prevent the error.
                                 label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                             >
                                 {pieData.map((entry, index) => (

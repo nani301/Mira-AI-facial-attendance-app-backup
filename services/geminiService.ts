@@ -1,17 +1,9 @@
-
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AttendanceRecord, PptContent, QuizContent } from '../types';
 
-let ai: GoogleGenAI | null = null;
-
-// The API key is securely managed in the environment and accessed via process.env.API_KEY
-if (process.env.API_KEY) {
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-} else {
-    console.warn("Gemini API key not found in environment variables. AI features will be disabled.");
-}
+// The API key is securely managed in the environment and accessed via process.env.API_KEY.
+// As per instructions, we assume this variable is pre-configured and valid, so we initialize directly.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
 /**
