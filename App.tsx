@@ -1,22 +1,31 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import Reports from './components/Reports';
-import AttendanceLog from './components/AttendanceLog';
-import ManageUsers from './components/ManageUsers';
 import Header from './components/Header';
-import Settings from './components/Settings';
-import Notebook from './components/Notebook';
 import type { Page, User } from './types';
 import { getAuthenticatedUser, getAllFaculty, setAuthenticatedUser as apiSetAuthenticatedUser } from './services/mockApiService';
-import SyllabusPage from './components/SyllabusPage';
-import ApplicationsPage from './components/ApplicationsPage';
-import SbtetResultsPage from './components/SbtetResultsPage';
-import TimetablePage from './components/TimetablePage';
-import FeedbackPage from './components/FeedbackPage';
 import Login from './components/Login';
 import SplashScreen from './components/SplashScreen';
+
+// Lazy load page components for better performance and code splitting
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Reports = lazy(() => import('./components/Reports'));
+const AttendanceLog = lazy(() => import('./components/AttendanceLog'));
+const ManageUsers = lazy(() => import('./components/ManageUsers'));
+const Settings = lazy(() => import('./components/Settings'));
+const Notebook = lazy(() => import('./components/Notebook'));
+const SyllabusPage = lazy(() => import('./components/SyllabusPage'));
+const ApplicationsPage = lazy(() => import('./components/ApplicationsPage'));
+const SbtetResultsPage = lazy(() => import('./components/SbtetResultsPage'));
+const TimetablePage = lazy(() => import('./components/TimetablePage'));
+const FeedbackPage = lazy(() => import('./components/FeedbackPage'));
+
+const PageLoader: React.FC = () => (
+    <div className="w-full h-full flex items-center justify-center p-10">
+        <div className="w-12 h-12 border-4 border-dashed rounded-full animate-spin border-indigo-600"></div>
+    </div>
+);
+
 
 const App: React.FC = () => {
     // State for splash screen
@@ -135,7 +144,9 @@ const App: React.FC = () => {
                     onUserChange={handleUserChange}
                 />
                 <main className="flex-1 p-6">
-                    {renderPage()}
+                    <Suspense fallback={<PageLoader />}>
+                        {renderPage()}
+                    </Suspense>
                 </main>
             </div>
         </div>

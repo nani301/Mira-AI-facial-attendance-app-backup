@@ -14,6 +14,12 @@ if (API_KEY) {
     console.warn("Gemini API key not found in environment variables. AI features will be disabled.");
 }
 
+/**
+ * Checks if the AI service has been initialized with an API key.
+ * @returns {boolean} True if the AI service is available, false otherwise.
+ */
+export const isAiAvailable = () => !!ai;
+
 const getAi = () => {
     if (!ai) {
         throw new Error("AI service is not available. Please configure the Gemini API key.");

@@ -227,7 +227,11 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
             setAccuracy(newAccuracy);
         } catch (err) {
             console.error(err);
-            setError("An error occurred while generating the content. Please try again.");
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError("An unknown error occurred while generating the content. Please try again.");
+            }
         } finally {
             setIsLoading(false);
         }
@@ -341,6 +345,23 @@ const OutputDisplay: React.FC<{output: any, type: Feature['outputType']}> = ({ o
 
 const Notebook: React.FC = () => {
     const [activeView, setActiveView] = useState<View>('hub');
+    const isGeminiConfigured = geminiService.isAiAvailable();
+    
+    if (!isGeminiConfigured) {
+        return (
+            <div className="h-full bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden p-8 flex flex-col items-center justify-center text-center">
+                 <div className="bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-full p-4 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                 </div>
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Features Disabled</h1>
+                <p className="mt-2 max-w-md text-slate-600 dark:text-slate-400">
+                    The Gemini API key has not been configured for this deployment. To enable the Notebook LLM, an administrator must set the <code>API_KEY</code> environment variable in the Vercel project settings and redeploy the application.
+                </p>
+            </div>
+        );
+    }
     
     const activeFeature = features.find(f => f.id === activeView);
 
