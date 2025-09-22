@@ -1,8 +1,7 @@
-
-import React, { useState, useEffect } from 'react';
-import { getDashboardStats } from '../services/mockApiService';
-import type { Page } from '../types';
-import { QrCodeIcon } from './Icons';
+import React from 'react';
+import type { Page, User } from '../types';
+import { Role } from '../types';
+import { QrCodeIcon, BellIcon, CheckBadgeIcon, NotebookIcon, LogIcon, ReportIcon, SyllabusIcon, ApplicationIcon } from './Icons';
 
 const StatCard: React.FC<{ title: string; value: string; color: string; total?: string }> = ({ title, value, color, total }) => (
     <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md flex-1">
@@ -13,16 +12,39 @@ const StatCard: React.FC<{ title: string; value: string; color: string; total?: 
 
 type DashboardProps = {
   setCurrentPage: (page: Page) => void;
+  currentUser: User | null;
+  stats: { present: number; absent: number; total: number; };
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
-    const [stats, setStats] = useState({ present: 0, absent: 0, total: 0 });
+const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage, currentUser, stats }) => {
+    if (!currentUser) {
+        return null; // Or a loading state
+    }
 
-    useEffect(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        getDashboardStats(todayStr).then(setStats);
-    }, []);
+    const { role } = currentUser;
+
+    const allCards = [
+        { id: 'mark-attendance', title: 'Mark Attendance', description: 'Open camera for facial recognition.', onClick: () => setCurrentPage('logs'), icon: <LogIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
+        { id: 'view-reports', title: 'View Reports', description: 'Analyze attendance data and trends.', onClick: () => setCurrentPage('reports'), icon: <ReportIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+        { id: 'approve-requests', title: 'Approve Requests', description: 'Manage leave and certificate applications.', onClick: () => setCurrentPage('requests'), icon: <CheckBadgeIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL] },
+        { id: 'reminders', title: 'Reminders & Calendar', description: 'Set deadlines and view important dates.', onClick: () => setCurrentPage('reminders'), icon: <BellIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL] },
+        { id: 'syllabus', title: 'Syllabus Progress', description: 'Check course completion status.', onClick: () => setCurrentPage('syllabus'), icon: <SyllabusIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+        { id: 'applications', title: 'Applications', description: 'Manage leave and bonafide requests.', onClick: () => setCurrentPage('applications'), icon: <ApplicationIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.STAFF] },
+        { id: 'notebook', title: 'Notebook LLM', description: 'AI tools for lesson planning.', onClick: () => setCurrentPage('notebook'), icon: <NotebookIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY], desktopOnly: true },
+        { id: 'qr-scanner', title: 'QR Desktop Login', description: 'Scan to pair with a desktop.', onClick: () => setCurrentPage('qr-scanner'), icon: <QrCodeIcon className="w-8 h-8 mb-2 text-indigo-500"/>, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF], mobileOnly: true },
+    ];
+
+    const visibleCards = allCards.filter(card => card.roles.includes(role));
+
+    let gridClasses = 'grid grid-cols-1 md:grid-cols-2 gap-6';
+    if (role === Role.PRINCIPAL) {
+        gridClasses += ' lg:grid-cols-3'; // 3x2 grid
+    } else if (role === Role.FACULTY || role === Role.HOD) {
+        gridClasses += ' lg:grid-cols-2'; // 2x2 grid
+    } else if (role === Role.STAFF) {
+        gridClasses += ' lg:grid-cols-2'; // 2x1 grid
+    }
 
     return (
         <div className="space-y-8">
@@ -32,11 +54,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 <StatCard title="Attendance %" value={`${stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(1) : 0}%`} color="text-indigo-500" />
             </div>
             
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <ActionCard title="Mark Attendance" description="Open camera to start facial recognition." onClick={() => setCurrentPage('logs')} />
-                <ActionCard title="View Reports" description="Analyze attendance data and trends." onClick={() => setCurrentPage('reports')} />
-                <ActionCard title="Syllabus Progress" description="Check course completion status." onClick={() => setCurrentPage('syllabus')} />
-                <ActionCard title="QR Desktop Login" description="Pair with a Windows desktop session." onClick={() => setCurrentPage('settings')} icon={<QrCodeIcon className="w-6 h-6 mb-2 text-indigo-500"/>}/>
+            <div className={gridClasses}>
+                {visibleCards.map(card => {
+                    const responsiveClass = card.mobileOnly ? 'md:hidden' : card.desktopOnly ? 'hidden md:flex' : 'flex';
+                    // For Staff, ensure the single-row layout on desktop
+                    const staffLayoutClass = role === Role.STAFF ? 'lg:col-span-1' : '';
+                    
+                    return (
+                        <div key={card.id} className={`${responsiveClass} ${staffLayoutClass}`}>
+                           <ActionCard title={card.title} description={card.description} onClick={card.onClick} icon={card.icon} />
+                        </div>
+                    );
+                })}
             </div>
 
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
@@ -55,7 +84,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
 };
 
 const ActionCard: React.FC<{title: string, description: string, onClick: () => void, icon?: React.ReactNode}> = ({ title, description, onClick, icon }) => (
-    <div onClick={onClick} className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-transform duration-200 cursor-pointer flex flex-col items-center text-center">
+    <div onClick={onClick} className="w-full bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-transform duration-200 cursor-pointer flex flex-col items-center text-center h-full">
         {icon}
         <h3 className="text-lg font-semibold text-indigo-600 dark:text-indigo-400 mb-2">{title}</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>

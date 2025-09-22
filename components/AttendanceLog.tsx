@@ -1,4 +1,7 @@
 
+
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { User, AttendanceRecord } from '../types';
@@ -152,7 +155,11 @@ const generateDemoTimeline = (): { timeline: TimelineEvent[] } => {
 };
 
 
-const AttendanceLog: React.FC = () => {
+type AttendanceLogProps = {
+    onAttendanceMarked: () => void;
+};
+
+const AttendanceLog: React.FC<AttendanceLogProps> = ({ onAttendanceMarked }) => {
     const [step, setStep] = useState<'capture' | 'result'>('capture');
     const [validatedUser, setValidatedUser] = useState<User | null>(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -194,33 +201,45 @@ const AttendanceLog: React.FC = () => {
     
     const onCaptureSuccess = useCallback(async () => {
         if (!validatedUser) return;
-        
+    
         const simulatedCoords = generateRandomCoordsInRadius(COLLEGE_CENTER_LAT, COLLEGE_CENTER_LNG, CAMPUS_RADIUS_METERS);
         
-        const now = new Date();
-        const adjustedTimestamp = new Date(now.getTime() + (6 * 60 * 60 * 1000) + 1000);
-        adjustedTimestamp.setFullYear(adjustedTimestamp.getFullYear() + 1);
-
-        const attendanceData = {
-            coords: simulatedCoords,
-            timestamp: adjustedTimestamp
-        };
-        setLastAttendance(attendanceData);
-        
-        await markAttendance(validatedUser.id, { lat: simulatedCoords.latitude, lng: simulatedCoords.longitude });
-        
-        const emailPayload = {
-            to: validatedUser.email,
-            cc: validatedUser.parent_email,
-            subject: `Attendance Confirmation for ${validatedUser.name}`
-        };
-        await sendEmail(emailPayload);
-
-        setIsVerifying(false);
-        setIsCameraOpen(false);
-        setStep('result');
-
-    }, [validatedUser]);
+        // Attempt to mark attendance
+        const result = await markAttendance(validatedUser.id, { lat: simulatedCoords.latitude, lng: simulatedCoords.longitude });
+    
+        // Check the result from the API
+        if (result.success) {
+            // On success, set state for the result view
+            const attendanceData = {
+                coords: simulatedCoords,
+                timestamp: new Date() // Use the current, correct timestamp
+            };
+            setLastAttendance(attendanceData);
+            
+            // Send notification email
+            const emailPayload = {
+                to: validatedUser.email,
+                cc: validatedUser.parent_email,
+                subject: `Attendance Confirmation for ${validatedUser.name}`
+            };
+            await sendEmail(emailPayload);
+            
+            // Trigger dashboard refresh
+            onAttendanceMarked();
+    
+            // Transition to the result step
+            setIsVerifying(false);
+            setIsCameraOpen(false);
+            setStep('result');
+        } else {
+            // On failure, show an alert and reset the UI
+            alert((result as { message?: string }).message || "Failed to mark attendance. You may have already checked in today.");
+            setIsVerifying(false);
+            setIsCameraOpen(false);
+            setValidatedUser(null);
+            setPinSelectorKey(Date.now()); // Resets the PinSelector component
+        }
+    }, [validatedUser, onAttendanceMarked]);
     
     const handleCameraStateChange = useCallback((state: CaptureState, error?: string | null) => {
         setCameraStatus(state);
@@ -233,6 +252,7 @@ const AttendanceLog: React.FC = () => {
     const handleMarkAttendanceClick = async () => {
         if (!validatedUser) return;
 
+        // Pre-verification check: see if the user has already marked attendance today
         const existingRecord = await checkTodaysAttendance(validatedUser.id);
         if (existingRecord && existingRecord.checkInTime) {
             alert(`Your attendance was already marked today at ${existingRecord.checkInTime}.`);

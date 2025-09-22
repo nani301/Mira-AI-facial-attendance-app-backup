@@ -1,4 +1,4 @@
-export type Page = 'dashboard' | 'reports' | 'logs' | 'users' | 'syllabus' | 'settings' | 'applications' | 'sbtet' | 'timetables' | 'feedback' | 'notebook';
+export type Page = 'dashboard' | 'reports' | 'logs' | 'users' | 'syllabus' | 'settings' | 'applications' | 'sbtet' | 'timetables' | 'feedback' | 'notebook' | 'reminders' | 'requests' | 'qr-scanner';
 
 export enum Role {
     ADMIN = 'Admin',
@@ -81,6 +81,7 @@ export interface Application {
     };
     created_at: string;
     decided_at?: string;
+    processed_by_name?: string;
 }
 
 export interface SubjectResult {
@@ -101,6 +102,36 @@ export interface Result {
     subjects: SubjectResult[];
 }
 
+// --- NEW: Types for Consolidated Academic History ---
+export interface SubjectMark {
+    subCode: string;
+    subjectName: string;
+    internal: number;
+    external: number;
+    total: number;
+    credits: number;
+}
+
+export interface SemesterResult {
+    semester: number;
+    sgpa: number;
+    status: 'Pass' | 'Fail';
+    subjects: SubjectMark[];
+}
+
+export interface AcademicHistory {
+    studentName: string;
+    pin: string;
+    branch: string;
+    // Summary
+    overallCGPA: number;
+    totalCredits: number;
+    totalBacklogs: number;
+    // Details
+    semesters: SemesterResult[];
+}
+
+
 export interface Timetable {
     id: string;
     branch: string;
@@ -111,11 +142,13 @@ export interface Timetable {
 
 export interface Feedback {
     id: string;
-    actor_id: string;
-    role: Role;
-    category: 'bug' | 'feature' | 'ux';
-    text: string;
-    created_at: string;
+    user_id: string; // The user who submitted it
+    user_name: string; // Denormalized for easy display
+    user_role: Role; // Denormalized for easy display
+    category: 'Suggestion' | 'Bug Report' | 'Other';
+    message: string;
+    is_anonymous: boolean;
+    created_at: string; // ISO 8601
 }
 
 export interface PptSlide {
@@ -138,4 +171,12 @@ export interface QuizQuestion {
 
 export interface QuizContent {
     questions: QuizQuestion[];
+}
+
+export interface Reminder {
+    id: string;
+    title: string;
+    description: string;
+    date: string; // YYYY-MM-DD
+    created_by: string; // user id of principal
 }

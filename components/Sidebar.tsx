@@ -1,7 +1,7 @@
-
 import React from 'react';
-import type { Page } from '../types';
-import { DashboardIcon, ReportIcon, LogIcon, UserIcon, LogoutIcon, SyllabusIcon, SettingsIcon, ApplicationIcon, ResultsIcon, TimetableIcon, FeedbackIcon, NotebookIcon, XCircleIcon } from './Icons';
+import type { Page, User } from '../types';
+import { Role } from '../types';
+import { DashboardIcon, ReportIcon, LogIcon, UserIcon, LogoutIcon, SyllabusIcon, SettingsIcon, ApplicationIcon, ResultsIcon, TimetableIcon, FeedbackIcon, NotebookIcon, XCircleIcon, CheckBadgeIcon, BellIcon } from './Icons';
 
 type SidebarProps = {
   isOpen: boolean;
@@ -9,6 +9,7 @@ type SidebarProps = {
   currentPage: Page;
   setCurrentPage: (page: Page) => void;
   onLogout: () => void;
+  currentUser: User | null;
 };
 
 const NavItem: React.FC<{
@@ -35,26 +36,43 @@ const NavItem: React.FC<{
   );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurrentPage, onLogout }) => {
-  const navItems = [
-    { page: 'dashboard' as Page, label: 'Dashboard', icon: <DashboardIcon className="w-6 h-6" /> },
-    { page: 'reports' as Page, label: 'Reports', icon: <ReportIcon className="w-6 h-6" /> },
-    { page: 'logs' as Page, label: 'Attendance Log', icon: <LogIcon className="w-6 h-6" /> },
-    { page: 'users' as Page, label: 'Manage Users', icon: <UserIcon className="w-6 h-6" /> },
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurrentPage, onLogout, currentUser }) => {
+  // Base item definitions with associated roles
+  const allNavItems = [
+    { page: 'dashboard' as Page, label: 'Dashboard', icon: <DashboardIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
+    { page: 'requests' as Page, label: 'Approve Requests', icon: <CheckBadgeIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL] },
+    { page: 'reminders' as Page, label: 'Reminders', icon: <BellIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL] },
+    { page: 'reports' as Page, label: 'Reports', icon: <ReportIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+    { page: 'logs' as Page, label: 'Attendance Log', icon: <LogIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
+    { page: 'users' as Page, label: 'Manage Users', icon: <UserIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
   ];
   
-  const academicItems = [
-     { page: 'applications' as Page, label: 'Applications', icon: <ApplicationIcon className="w-6 h-6" /> },
-     { page: 'sbtet' as Page, label: 'SBTET Results', icon: <ResultsIcon className="w-6 h-6" /> },
-     { page: 'syllabus' as Page, label: 'Syllabus', icon: <SyllabusIcon className="w-6 h-6" /> },
-     { page: 'timetables' as Page, label: 'Timetables', icon: <TimetableIcon className="w-6 h-6" /> },
-     { page: 'notebook' as Page, label: 'Notebook LLM', icon: <NotebookIcon className="w-6 h-6" /> },
+  const allAcademicItems = [
+     { page: 'applications' as Page, label: 'Applications', icon: <ApplicationIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
+     { page: 'sbtet' as Page, label: 'SBTET Results', icon: <ResultsIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+     { page: 'syllabus' as Page, label: 'Syllabus', icon: <SyllabusIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+     { page: 'timetables' as Page, label: 'Timetables', icon: <TimetableIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
+     { page: 'notebook' as Page, label: 'Notebook LLM', icon: <NotebookIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY] },
   ];
   
-  const systemItems = [
-      { page: 'feedback' as Page, label: 'Feedback', icon: <FeedbackIcon className="w-6 h-6" /> },
-      { page: 'settings' as Page, label: 'Settings', icon: <SettingsIcon className="w-6 h-6" /> },
+  const allSystemItems = [
+      { page: 'feedback' as Page, label: 'Feedback', icon: <FeedbackIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
+      { page: 'settings' as Page, label: 'Settings', icon: <SettingsIcon className="w-6 h-6" />, roles: [Role.PRINCIPAL, Role.HOD, Role.FACULTY, Role.STAFF] },
   ];
+
+  const userRole = currentUser?.role;
+
+  // Filter items based on the current user's role
+  const filterItemsByRole = (items: typeof allNavItems) => {
+      if (!userRole) return [];
+      if (userRole === Role.PRINCIPAL) return items; // Principal sees all
+      return items.filter(item => item.roles.includes(userRole));
+  };
+
+  const navItems = filterItemsByRole(allNavItems);
+  const academicItems = filterItemsByRole(allAcademicItems);
+  const systemItems = filterItemsByRole(allSystemItems);
+
 
   return (
     <aside className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 flex-shrink-0 p-4 flex flex-col shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!isOpen}>
@@ -73,39 +91,51 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, setCurr
             </button>
         </div>
       <nav className="flex-1 overflow-y-auto -mr-2 pr-2">
-          <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Main</p>
-          <ul>
-            {navItems.map((item) => (
-              <NavItem
-                key={item.page}
-                {...item}
-                isActive={currentPage === item.page}
-                onClick={() => setCurrentPage(item.page)}
-              />
-            ))}
-          </ul>
-           <p className="mt-6 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Academics</p>
-           <ul>
-            {academicItems.map((item) => (
-              <NavItem
-                key={item.page}
-                {...item}
-                isActive={currentPage === item.page}
-                onClick={() => setCurrentPage(item.page)}
-              />
-            ))}
-          </ul>
-          <p className="mt-6 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">System</p>
-           <ul>
-            {systemItems.map((item) => (
-              <NavItem
-                key={item.page}
-                {...item}
-                isActive={currentPage === item.page}
-                onClick={() => setCurrentPage(item.page)}
-              />
-            ))}
-        </ul>
+          {navItems.length > 0 && (
+            <>
+                <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Main</p>
+                <ul>
+                    {navItems.map((item) => (
+                    <NavItem
+                        key={item.page}
+                        {...item}
+                        isActive={currentPage === item.page}
+                        onClick={() => setCurrentPage(item.page)}
+                    />
+                    ))}
+                </ul>
+            </>
+          )}
+          {academicItems.length > 0 && (
+            <>
+                <p className="mt-6 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Academics</p>
+                <ul>
+                    {academicItems.map((item) => (
+                    <NavItem
+                        key={item.page}
+                        {...item}
+                        isActive={currentPage === item.page}
+                        onClick={() => setCurrentPage(item.page)}
+                    />
+                    ))}
+                </ul>
+            </>
+          )}
+          {systemItems.length > 0 && (
+            <>
+                 <p className="mt-6 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">System</p>
+                <ul>
+                    {systemItems.map((item) => (
+                    <NavItem
+                        key={item.page}
+                        {...item}
+                        isActive={currentPage === item.page}
+                        onClick={() => setCurrentPage(item.page)}
+                    />
+                    ))}
+                </ul>
+            </>
+          )}
       </nav>
       <div>
         <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>

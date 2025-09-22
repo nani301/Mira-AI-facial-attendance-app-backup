@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import type { Application, User } from '../types';
 import { Role, ApplicationType, ApplicationStatus } from '../types';
@@ -281,7 +282,7 @@ const AdminView: React.FC = () => {
 
 const StudentView: React.FC<{ user: User }> = ({ user }) => {
     const [applications, setApplications] = useState<Application[]>([]);
-    const [activeTab, setActiveTab] = useState<'leave' | 'bonafide'>('leave');
+    const [activeTab, setActiveTab] = useState<'leave' | 'bonafide' | 'tc'>('leave');
     
     const fetchApplications = () => {
          getApplicationsByUserId(user.id).then(setApplications);
@@ -390,6 +391,42 @@ const StudentView: React.FC<{ user: User }> = ({ user }) => {
         );
     };
 
+    const StudentTCForm: React.FC = () => {
+        const [reason, setReason] = useState('');
+        const [isSubmitting, setIsSubmitting] = useState(false);
+        
+        const handleSubmit = async (e: React.FormEvent) => {
+            e.preventDefault();
+            setIsSubmitting(true);
+            try {
+                const newApp = await submitApplication({
+                    pin: user.pin,
+                    type: ApplicationType.TC,
+                    payload: { reason }
+                });
+                handleApplicationSubmitted(newApp);
+                setReason('');
+            } finally {
+                setIsSubmitting(false);
+            }
+        };
+        
+        return (
+            <form onSubmit={handleSubmit} className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-medium">Reason for Leaving</label>
+                    <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} className={inputClasses} placeholder="e.g., Joining another college" required></textarea>
+                </div>
+                <button type="submit" disabled={isSubmitting || !reason} className={`${buttonClasses} w-full`}>
+                    {isSubmitting ? 'Submitting...' : 'Request Transfer Certificate'}
+                </button>
+            </form>
+        );
+    };
+    
+    const filterType = activeTab === 'leave' ? ApplicationType.LEAVE : activeTab === 'bonafide' ? ApplicationType.BONAFIDE : ApplicationType.TC;
+    const filteredApps = applications.filter(a => a.type === filterType);
+
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><ApplicationIcon className="w-6 h-6"/> My Applications</h2>
@@ -402,19 +439,24 @@ const StudentView: React.FC<{ user: User }> = ({ user }) => {
                         <button onClick={() => setActiveTab('bonafide')} className={`${activeTab === 'bonafide' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>
                             Bonafide Certificate
                         </button>
+                        <button onClick={() => setActiveTab('tc')} className={`${activeTab === 'tc' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>
+                            Transfer Certificate
+                        </button>
                     </nav>
                 </div>
                 
                 <div className="mb-8">
                      <h3 className="text-lg font-semibold mb-2">
-                        {activeTab === 'leave' ? 'Submit a Leave Request' : 'Request a Bonafide Certificate'}
+                        {activeTab === 'leave' ? 'Submit a Leave Request' : activeTab === 'bonafide' ? 'Request a Bonafide Certificate' : 'Request a Transfer Certificate'}
                     </h3>
-                    {activeTab === 'leave' ? <StudentLeaveForm /> : <StudentBonafideForm />}
+                    {activeTab === 'leave' && <StudentLeaveForm />}
+                    {activeTab === 'bonafide' && <StudentBonafideForm />}
+                    {activeTab === 'tc' && <StudentTCForm />}
                 </div>
 
                 <h3 className="text-lg font-semibold mb-4">Your Past Applications</h3>
                 <ul className="space-y-3">
-                    {applications.filter(a => a.type === (activeTab === 'leave' ? ApplicationType.LEAVE : ApplicationType.BONAFIDE)).map(app => (
+                    {filteredApps.map(app => (
                          <li key={app.id} className="p-4 border rounded-lg flex flex-col sm:flex-row justify-between sm:items-center dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                            <div className="flex-grow">
                                 <p className="font-semibold">{app.payload.reason || app.payload.purpose}</p>
@@ -435,7 +477,7 @@ const StudentView: React.FC<{ user: User }> = ({ user }) => {
                            </div>
                         </li>
                     ))}
-                     {applications.filter(a => a.type === (activeTab === 'leave' ? ApplicationType.LEAVE : ApplicationType.BONAFIDE)).length === 0 && (
+                     {filteredApps.length === 0 && (
                         <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">No past {activeTab} applications found.</p>
                      )}
                 </ul>

@@ -1,9 +1,10 @@
 
 
+
 import React, { useState } from 'react';
 import { 
     LightbulbIcon, QuestionMarkCircleIcon, PresentationChartBarIcon, BookOpenIcon, 
-    ShareIcon, BeakerIcon, ArrowLeftIcon, SparklesIcon, DownloadIcon 
+    ShareIcon, BeakerIcon, ArrowLeftIcon, SparklesIcon, DownloadIcon, UploadIcon
 } from './Icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 import type { PptSlide, QuizQuestion } from '../types.ts';
@@ -58,6 +59,57 @@ const AccuracyBar: React.FC<{ current: number; previous: number }> = ({ current,
     </div>
 );
 
+const PptOutput: React.FC<{ content: { title: string, slides: PptSlide[] } }> = ({ content }) => {
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const slide = content.slides[currentSlide];
+
+    return (
+        <div className="flex flex-col h-full">
+            <h4 className="text-lg font-bold text-center mb-2">{content.title}</h4>
+            <div className="flex-grow bg-white dark:bg-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-700">
+                <h5 className="font-bold text-indigo-600 dark:text-indigo-400">{slide.title}</h5>
+                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                    {slide.points.map((point, i) => <li key={i}>{point}</li>)}
+                </ul>
+                {slide.notes && <p className="text-xs mt-4 p-2 bg-slate-100 dark:bg-slate-700 rounded italic">Notes: {slide.notes}</p>}
+            </div>
+            <div className="flex justify-between items-center mt-2 text-sm">
+                <button onClick={() => setCurrentSlide(s => Math.max(0, s - 1))} disabled={currentSlide === 0} className="font-semibold disabled:opacity-50">&larr; Prev</button>
+                <span>Slide {currentSlide + 1} of {content.slides.length}</span>
+                <button onClick={() => setCurrentSlide(s => Math.min(content.slides.length - 1, s + 1))} disabled={currentSlide === content.slides.length - 1} className="font-semibold disabled:opacity-50">Next &rarr;</button>
+            </div>
+        </div>
+    );
+};
+
+const QuizOutput: React.FC<{ content: { questions: QuizQuestion[] } }> = ({ content }) => {
+    const [showAnswers, setShowAnswers] = useState(false);
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-2">
+                <h4 className="font-bold">Generated Quiz</h4>
+                <button onClick={() => setShowAnswers(!showAnswers)} className="text-xs font-semibold text-indigo-600 hover:underline">
+                    {showAnswers ? 'Hide Answers' : 'Show Answers'}
+                </button>
+            </div>
+            <div className="space-y-4 text-sm">
+                {content.questions.map((q, i) => (
+                    <div key={i} className="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <p><strong>{i + 1}. {q.question}</strong></p>
+                        {q.options && (
+                            <ul className="list-alpha list-inside pl-2 mt-1 space-y-0.5" style={{ listStyleType: 'lower-alpha' }}>
+                                {q.options.map((opt, j) => <li key={j}>{opt}</li>)}
+                            </ul>
+                        )}
+                        {showAnswers && <p className="mt-1 text-green-600 dark:text-green-400 font-semibold">Answer: {q.answer}</p>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, onBack }) => {
     const [inputText, setInputText] = useState('');
@@ -92,6 +144,23 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+    
+    const handleGenerate = async () => {
+        setIsLoading(true);
+        setError(null);
+        setOutput(null);
+        setAccuracy(null);
+        try {
+            const result = await feature.generator(inputText);
+            setOutput(result);
+            // Simulate accuracy calculation
+            setTimeout(() => setAccuracy(85 + Math.random() * 14), 500);
+        } catch (err: any) {
+            setError(err.message || 'An unexpected error occurred.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleExport = (format: 'csv' | 'pdf') => {
@@ -193,245 +262,139 @@ const Workspace: React.FC<{feature: Feature, onBack: () => void}> = ({ feature, 
                 (output.questions as QuizQuestion[]).forEach((q, index) => {
                     htmlContent += `
                         <div class="quiz-item">
-                            <p><strong>${index + 1}. ${q.question}</strong> (${q.type})</p>
-                            ${q.options ? `<ul>${q.options.map((opt: string) => `<li>${opt}</li>`).join('')}</ul>` : ''}
+                            <h4>Q${index + 1}: ${q.question}</h4>
+                            ${q.options ? `<ul>${q.options.map((o: string) => `<li>${o}</li>`).join('')}</ul>` : ''}
                             <p class="answer">Answer: ${q.answer}</p>
                         </div>
                     `;
                 });
             }
-    
-            htmlContent += '</body></html>';
-            
+            htmlContent += `</body></html>`;
+        
             const printWindow = window.open('', '_blank');
             if (printWindow) {
                 printWindow.document.write(htmlContent);
                 printWindow.document.close();
-                printWindow.focus();
                 printWindow.print();
             } else {
-                alert('Could not open print window. Please disable your pop-up blocker and try again.');
+                alert('Could not open print window. Please disable your pop-up blocker.');
             }
         }
     };
     
-     const handleShare = async () => {
-        if (!output) return;
-
-        let shareText = `Notebook LLM Output: ${feature.title}\n\n`;
-
-        if (feature.outputType === 'text' || feature.outputType === 'mindmap') {
-            shareText += output;
-        } else if (feature.outputType === 'ppt') {
-            (output.slides as PptSlide[]).forEach((slide, slideIndex) => {
-                shareText += `Slide ${slideIndex + 1}: ${slide.title}\n`;
-                slide.points.forEach((point) => {
-                    shareText += `- ${point}\n`;
-                });
-                if (slide.notes) {
-                    shareText += `Notes: ${slide.notes}\n`;
-                }
-                shareText += '\n';
-            });
-        } else if (feature.outputType === 'quiz') {
-            (output.questions as QuizQuestion[]).forEach((q, index) => {
-                shareText += `${index + 1}. ${q.question} (${q.type})\n`;
-                if (q.options) {
-                    shareText += q.options.join('\n');
-                    shareText += '\n';
-                }
-                shareText += `Answer: ${q.answer}\n\n`;
-            });
-        }
-
-        const shareData = {
-            title: feature.title,
-            text: shareText,
-        };
-
-        if (navigator.share) {
-            try {
-                await navigator.share(shareData);
-            } catch (err) {
-                console.error("Share failed:", err);
-            }
-        } else {
-            alert("Share feature is not supported on your browser.");
-        }
-    };
-
-    const handleGenerate = async () => {
-        if (!inputText) return;
-        setIsLoading(true);
-        setError(null);
-        setOutput(null);
-        setAccuracy(null);
-        try {
-            const result = await feature.generator(inputText);
-            setOutput(result);
-            // Simulate new accuracy based on previous
-            const newAccuracy = Math.max(0, Math.min(100, previousAccuracy + (Math.random() * 10 - 4)));
-            setAccuracy(newAccuracy);
-        } catch (err) {
-            console.error(err);
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError("An unknown error occurred while generating the content. Please try again.");
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     return (
-        <div className="flex flex-col h-full">
-            <header className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-4">
-                <button onClick={onBack} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700">
-                    <ArrowLeftIcon className="w-6 h-6"/>
+        <div className="space-y-6 animate-fade-in-up">
+            <header className="flex items-center gap-4">
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <ArrowLeftIcon className="w-6 h-6" />
                 </button>
-                <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
-                    <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-md">{feature.icon}</div>
+                <div className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg p-3">
+                    {feature.icon}
+                </div>
+                <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{feature.title}</h2>
+                    <p className="text-slate-600 dark:text-slate-400">{feature.description}</p>
                 </div>
             </header>
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 dark:bg-slate-700">
-                <div className="bg-white dark:bg-slate-800 p-6 flex flex-col">
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Input Panel */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold mb-2">Input</h3>
-                    <textarea 
+                    <textarea
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder={feature.prompt}
-                        className="w-full flex-grow p-4 text-base bg-slate-100 dark:bg-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        className="w-full h-64 p-3 border border-slate-300 dark:border-slate-600 rounded-md resize-none bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={isLoading}
                     />
-                    <div className="mt-4">
-                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Or upload a file (text, pdf, images)</label>
-                        <div className="flex items-center gap-2">
-                             <input type="file" onChange={handleFileChange} accept="image/*,application/pdf,.txt" className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-                            {uploadedFile && (
-                                <button onClick={handleDownloadUploaded} title="Download uploaded file" className="text-sm font-semibold p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600">
-                                    <DownloadIcon className="w-5 h-5"/>
-                                </button>
-                            )}
-                        </div>
+                    <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                         <label className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 cursor-pointer">
+                            <UploadIcon className="w-4 h-4" />
+                            <span>{uploadedFile ? 'Change File' : 'Upload File'}</span>
+                            <input type="file" className="hidden" onChange={handleFileChange} />
+                        </label>
+                        <button
+                            onClick={handleGenerate}
+                            disabled={isLoading || !inputText.trim()}
+                            className="w-full sm:w-auto font-bold py-2 px-4 rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 flex items-center justify-center gap-2"
+                        >
+                            <SparklesIcon className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                            {isLoading ? 'Generating...' : 'Generate'}
+                        </button>
                     </div>
-                    <button onClick={handleGenerate} disabled={isLoading || !inputText} className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 transition-colors">
-                        <SparklesIcon className="w-5 h-5"/>
-                        {isLoading ? 'Generating...' : 'Generate'}
-                    </button>
+                     {uploadedFile && (
+                        <div className="mt-3 text-xs flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-700 rounded">
+                            <span>{uploadedFile.name}</span>
+                            <button onClick={handleDownloadUploaded} className="font-semibold text-indigo-600 hover:underline">Download</button>
+                        </div>
+                    )}
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-6 flex flex-col">
+
+                {/* Output Panel */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
                     <div className="flex justify-between items-center mb-2">
                         <h3 className="text-lg font-semibold">Output</h3>
                         {output && (
-                             <div className="flex items-center gap-2">
-                                <button onClick={() => handleExport('csv')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
-                                    <DownloadIcon className="w-4 h-4" /> CSV
-                                </button>
-                                <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
-                                    <DownloadIcon className="w-4 h-4" /> PDF
-                                </button>
-                                <button onClick={handleShare} className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
-                                    <ShareIcon className="w-4 h-4" /> Share
-                                </button>
+                             <div className="flex gap-2">
+                                <button onClick={() => handleExport('csv')} className="flex items-center gap-1 text-xs font-semibold p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600"><DownloadIcon className="w-4 h-4"/> CSV</button>
+                                <button onClick={() => handleExport('pdf')} className="flex items-center gap-1 text-xs font-semibold p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600"><DownloadIcon className="w-4 h-4"/> PDF</button>
                             </div>
                         )}
                     </div>
-                    <div className="p-4 bg-slate-50 dark:bg-slate-900/70 rounded-lg flex-grow overflow-y-auto">
-                        {isLoading && <p className="text-center text-slate-500">Generating, please wait...</p>}
+                    <div className="w-full h-96 p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-900/50 overflow-y-auto">
+                        {isLoading && <p className="text-slate-500 animate-pulse">Generating your content...</p>}
                         {error && <p className="text-red-500">{error}</p>}
-                        {!isLoading && !output && <p className="text-center text-slate-500">Output will appear here.</p>}
-                        {output && <OutputDisplay output={output} type={feature.outputType} />}
-                        {output && accuracy && (
-                            <AccuracyBar current={accuracy} previous={previousAccuracy} />
-                        )}
+                        {output && feature.outputType === 'text' && <pre className="whitespace-pre-wrap text-sm">{output}</pre>}
+                        {output && feature.outputType === 'mindmap' && <pre className="whitespace-pre-wrap text-sm font-mono">{output}</pre>}
+                        {output && feature.outputType === 'ppt' && <PptOutput content={output} />}
+                        {output && feature.outputType === 'quiz' && <QuizOutput content={output} />}
+                        {!isLoading && !error && !output && <p className="text-slate-400">Your generated content will appear here.</p>}
                     </div>
+                     {accuracy !== null && <AccuracyBar current={accuracy} previous={previousAccuracy} />}
                 </div>
             </div>
         </div>
     );
-};
-
-const OutputDisplay: React.FC<{output: any, type: Feature['outputType']}> = ({ output, type }) => {
-    switch(type) {
-        case 'text':
-            return <p className="whitespace-pre-wrap">{output}</p>;
-        case 'mindmap':
-             return <pre className="whitespace-pre-wrap font-mono text-sm">{output}</pre>;
-        case 'ppt':
-            return (
-                <div className="space-y-4">
-                    {(output.slides as PptSlide[]).map((slide, index) => (
-                        <div key={index} className="p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800">
-                            <p className="text-xs text-slate-500">SLIDE {index + 1}</p>
-                            <h4 className="font-bold text-lg">{slide.title}</h4>
-                            <ul className="list-disc list-inside text-sm mt-2">
-                                {slide.points.map((point, i) => <li key={i}>{point}</li>)}
-                            </ul>
-                            {slide.notes && <p className="text-xs mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-slate-500">Notes: {slide.notes}</p>}
-                        </div>
-                    ))}
-                </div>
-            );
-        case 'quiz':
-            return (
-                 <div className="space-y-4">
-                    {(output.questions as QuizQuestion[]).map((q, index) => (
-                        <div key={index} className="p-4 border border-slate-300 dark:border-slate-600 rounded-lg">
-                           <p className="font-semibold">{index + 1}. {q.question}</p>
-                           {q.options && (
-                                <ul className="text-sm space-y-1 mt-2">
-                                   {q.options.map((opt, i) => <li key={i}>{opt}</li>)}
-                                </ul>
-                           )}
-                           <p className="text-sm mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-green-600 dark:text-green-400 font-bold">Answer: {q.answer}</p>
-                        </div>
-                    ))}
-                </div>
-            );
-        default: return <p>Unsupported output type</p>;
-    }
 };
 
 const Notebook: React.FC = () => {
-    const [activeView, setActiveView] = useState<View>('hub');
-    const isGeminiConfigured = geminiService.isAiAvailable();
-    
-    if (!isGeminiConfigured) {
+    const [currentView, setCurrentView] = useState<View>('hub');
+    const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+
+    const handleSelectFeature = (id: View) => {
+        const feature = features.find(f => f.id === id);
+        if (feature) {
+            setSelectedFeature(feature);
+            setCurrentView(id);
+        }
+    };
+
+    const handleBackToHub = () => {
+        setCurrentView('hub');
+        setSelectedFeature(null);
+    };
+
+    if (currentView === 'hub' || !selectedFeature) {
         return (
-            <div className="h-full bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden p-8 flex flex-col items-center justify-center text-center">
-                 <div className="bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-full p-4 mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
-                 </div>
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Features Disabled</h1>
-                 <p className="mt-2 max-w-lg text-slate-600 dark:text-slate-400">
-                    The Gemini API key has not been configured for this application. Please contact your administrator to enable AI-powered notebook features.
-                </p>
+            <div className="space-y-6">
+                <header className="flex items-center gap-4">
+                    <SparklesIcon className="w-12 h-12 text-indigo-500" />
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Notebook LLM</h2>
+                        <p className="mt-1 text-slate-600 dark:text-slate-400">Your AI-powered toolkit for smarter lesson planning and content creation.</p>
+                    </div>
+                </header>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {features.map(feature => (
+                        <FeatureCard key={feature.id} feature={feature} onSelect={handleSelectFeature} />
+                    ))}
+                </div>
             </div>
         );
     }
-    
-    const activeFeature = features.find(f => f.id === activeView);
 
-    return (
-        <div className="h-full bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden">
-            {activeView === 'hub' ? (
-                <div className="p-6 sm:p-8">
-                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Notebook LLM for Teachers</h1>
-                    <p className="mt-2 text-slate-600 dark:text-slate-400">Your toolkit for smarter lesson planning, assessment creation, and student engagement.</p>
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {features.map(feature => (
-                           <FeatureCard key={feature.id} feature={feature} onSelect={setActiveView} />
-                        ))}
-                    </div>
-                </div>
-            ) : activeFeature ? (
-                <Workspace feature={activeFeature} onBack={() => setActiveView('hub')} />
-            ) : null}
-        </div>
-    );
+    return <Workspace feature={selectedFeature} onBack={handleBackToHub} />;
 };
-
+// FIX: Added default export to resolve lazy loading issue in App.tsx
 export default Notebook;

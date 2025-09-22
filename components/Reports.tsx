@@ -1,9 +1,12 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getAttendanceByDateAndBranch, getUsers } from '../services/mockApiService';
 import type { AttendanceRecord, User } from '../types';
 import { AttendanceStatus, Role } from '../types';
-import { ExportIcon, ShareIcon } from './Icons';
+import { ExportIcon, ShareIcon, SparklesIcon, XCircleIcon } from './Icons';
+import { generateReportSummary } from '../services/geminiService';
 
 // Normalizes PIN input (e.g., "23101cs001" -> "23-101-CS-001")
 const normalizePin = (pin: string): string => {    
@@ -111,12 +114,20 @@ const Reports: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isExportOpen, setIsExportOpen] = useState(false);
 
+    // AI Summary State
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summaryError, setSummaryError] = useState<string | null>(null);
+
     useEffect(() => {
         getUsers().then(setAllUsers);
     }, []);
     
     useEffect(() => {
         getAttendanceByDateAndBranch(date, viewMode).then(setAttendance);
+        // Reset AI summary when filters change
+        setAiSummary(null);
+        setSummaryError(null);
     }, [viewMode, date]);
 
     const { usersForView, filteredUsers, isFacultyView } = useMemo(() => {
@@ -165,10 +176,62 @@ const Reports: React.FC = () => {
         setIsExportOpen(false);
     };
 
+    const handleDownloadCsv = () => {
+        if (attendance.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+        const headers = ["PIN", "Name", "Status", "Check-in Time"];
+        const csvRows = [
+            headers.join(','),
+            ...attendance.map(row => 
+                [
+                    `"${row.userPin}"`,
+                    `"${row.userName}"`,
+                    `"${row.status}"`,
+                    `"${row.checkInTime || 'N/A'}"`
+                ].join(',')
+            )
+        ];
+    
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `attendance_report_${viewMode}_${date}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        setIsExportOpen(false);
+    };
+    
+    const handleDownloadPdf = () => {
+        window.print();
+        setIsExportOpen(false);
+    };
+
+    const handleGenerateSummary = async () => {
+        setIsGeneratingSummary(true);
+        setSummaryError(null);
+        setAiSummary(null);
+        try {
+            const summary = await generateReportSummary(attendance);
+            setAiSummary(summary);
+        } catch (err: any) {
+            setSummaryError(err.message || 'An unexpected error occurred.');
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-start mb-4">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md printable-area">
+                <div className="flex justify-between items-start mb-4 no-print">
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Daily Attendance Report</h3>
                     <div className="relative">
                          <button onClick={() => setIsExportOpen(!isExportOpen)} className="flex items-center gap-2 bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-700 transition-colors text-sm">
@@ -176,10 +239,10 @@ const Reports: React.FC = () => {
                         </button>
                         {isExportOpen && (
                             <div onMouseLeave={() => setIsExportOpen(false)} className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5">
-                                <a href="#" onClick={(e) => { e.preventDefault(); alert('Exporting to CSV...'); setIsExportOpen(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <a href="#" onClick={(e) => { e.preventDefault(); handleDownloadCsv(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
                                     <ExportIcon className="w-4 h-4" /> Download CSV
                                 </a>
-                                <a href="#" onClick={(e) => { e.preventDefault(); alert('Exporting to PDF...'); setIsExportOpen(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <a href="#" onClick={(e) => { e.preventDefault(); handleDownloadPdf(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
                                      <ExportIcon className="w-4 h-4" /> Download PDF
                                 </a>
                                  <a href="#" onClick={(e) => { e.preventDefault(); handleShare(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -190,7 +253,7 @@ const Reports: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 no-print">
                      <PinInput 
                         value={searchTerm} 
                         onChange={setSearchTerm} 
@@ -216,6 +279,58 @@ const Reports: React.FC = () => {
                         />
                     </div>
                 </div>
+                
+                <div className="my-6 p-4 border border-indigo-200 dark:border-indigo-800 rounded-lg bg-indigo-50 dark:bg-slate-900/50 no-print">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <SparklesIcon className="w-6 h-6 text-indigo-500" />
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-100">AI-Powered Summary</h4>
+                        </div>
+                        <button 
+                            onClick={handleGenerateSummary}
+                            disabled={isGeneratingSummary || attendance.length === 0}
+                            className="font-bold py-2 px-4 rounded-lg transition-colors bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 flex items-center gap-2 text-sm"
+                        >
+                            {isGeneratingSummary ? (
+                                <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Analyzing...
+                                </>
+                            ) : (
+                                "Generate Summary"
+                            )}
+                        </button>
+                    </div>
+                    {isGeneratingSummary && <p className="mt-4 text-sm text-slate-500 dark:text-slate-400 text-center">Mira AI is analyzing the attendance data. This may take a moment...</p>}
+                    {summaryError && (
+                         <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm flex items-start gap-2">
+                            <XCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5"/>
+                            <div>
+                                <p className="font-semibold">Error Generating Summary</p>
+                                <p>{summaryError}</p>
+                            </div>
+                         </div>
+                    )}
+                    {aiSummary && (
+                        <div className="mt-4 text-sm text-slate-700 dark:text-slate-300 space-y-2">
+                            {aiSummary.split('\n').filter(line => line.trim() !== '').map((line, i) => {
+                                const isListItem = line.trim().startsWith('* ') || line.trim().startsWith('- ');
+                                if (isListItem) {
+                                    return (
+                                        <div key={i} className="flex items-start">
+                                            <span className="mr-2 mt-1">•</span>
+                                            <span>{line.substring(line.indexOf(' ') + 1)}</span>
+                                        </div>
+                                    );
+                                }
+                                return <p key={i}>{line}</p>;
+                            })}
+                        </div>
+                    )}
+                </div>
 
                 {isFacultyView ? (
                     <FacultyList users={filteredUsers} attendance={attendance} onSelectUser={(user) => alert(`Selected Faculty: ${user.name} (${user.pin})`)} />
@@ -226,7 +341,7 @@ const Reports: React.FC = () => {
                  <p className="text-right mt-4 font-semibold">{stats.present}/{stats.total} Present</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 no-print">
                 <div className="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
                     <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">Daily Attendance Trend (Last 7 Days)</h3>
                     {/* Bar chart data would be fetched here */}

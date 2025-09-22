@@ -1,10 +1,10 @@
 
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import type { Page, User } from './types';
-import { getAuthenticatedUser, getAllFaculty, setAuthenticatedUser as apiSetAuthenticatedUser } from './services/mockApiService';
+import { getAllFaculty, setAuthenticatedUser as apiSetAuthenticatedUser, updateUserProfile, getDashboardStats } from './services/mockApiService';
 import Login from './components/Login';
 import SplashScreen from './components/SplashScreen';
 
@@ -20,6 +20,10 @@ const ApplicationsPage = lazy(() => import('./components/ApplicationsPage'));
 const SbtetResultsPage = lazy(() => import('./components/SbtetResultsPage'));
 const TimetablePage = lazy(() => import('./components/TimetablePage'));
 const FeedbackPage = lazy(() => import('./components/FeedbackPage'));
+const RemindersPage = lazy(() => import('./components/RemindersPage'));
+const RequestsPage = lazy(() => import('./components/RequestsPage'));
+const QRScannerPage = lazy(() => import('./components/QRScannerPage'));
+
 
 const PageLoader: React.FC = () => (
     <div className="w-full h-full flex items-center justify-center p-10">
@@ -37,6 +41,7 @@ const App: React.FC = () => {
 
     // State for navigation
     const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // State for user and theme
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -45,8 +50,8 @@ const App: React.FC = () => {
         return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     });
 
-    // Sidebar visibility is now directly linked to the theme
-    const isSidebarOpen = theme === 'dark';
+    // NEW: State for dashboard stats, lifted from Dashboard component
+    const [dashboardStats, setDashboardStats] = useState({ present: 0, absent: 0, total: 0 });
 
     // Splash screen timer effect
     useEffect(() => {
@@ -56,12 +61,19 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
 
+    // NEW: Function to fetch/refresh dashboard stats
+    const fetchDashboardStats = useCallback(async () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const stats = await getDashboardStats(todayStr);
+        setDashboardStats(stats);
+    }, []);
 
     useEffect(() => {
-        // Fetch initial user and faculty data
-        getAuthenticatedUser().then(setCurrentUser);
+        // Fetch all faculty for the user switcher dropdown
         getAllFaculty().then(setFacultyList);
-    }, []);
+        // Fetch initial dashboard stats
+        fetchDashboardStats();
+    }, [fetchDashboardStats]);
 
     // Theme handling effect
     useEffect(() => {
@@ -74,45 +86,69 @@ const App: React.FC = () => {
         }
     }, [theme]);
     
-    const handleLogin = () => {
-        setIsAuthenticated(true);
+    const handleLogin = (user: User) => {
+        // When a user logs in, set their ID in the mock API state
+        // and update the app's state.
+        apiSetAuthenticatedUser(user.id).then(authedUser => {
+             if (authedUser) {
+                setCurrentUser(authedUser);
+                setIsAuthenticated(true);
+            }
+        });
     };
 
     const handleLogout = () => {
         setIsAuthenticated(false);
         setCurrentUser(null);
     };
+    
+    const closeSidebar = () => {
+        setIsSidebarOpen(false);
+    };
 
-    const toggleTheme = () => {
+    const handleThemeAndSidebarToggle = () => {
+        setIsSidebarOpen(prev => !prev);
         setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
     };
 
     const handleUserChange = (userId: string) => {
         apiSetAuthenticatedUser(userId).then(setCurrentUser);
     };
+    
+    const handleUpdateUser = async (updates: Partial<User>) => {
+        if (currentUser) {
+            const updatedUser = await updateUserProfile(currentUser.id, updates);
+            if(updatedUser) {
+                setCurrentUser(updatedUser);
+            }
+        }
+    };
+
 
     const handlePageChange = (page: Page) => {
         setCurrentPage(page);
         if (window.innerWidth < 768) {
-            // On mobile, changing page closes the sidebar by switching to light theme
-            setTheme('light');
+            closeSidebar();
         }
     };
 
     const renderPage = () => {
         switch (currentPage) {
-            case 'dashboard': return <Dashboard setCurrentPage={handlePageChange} />;
+            case 'dashboard': return <Dashboard setCurrentPage={handlePageChange} currentUser={currentUser} stats={dashboardStats} />;
             case 'reports': return <Reports />;
-            case 'logs': return <AttendanceLog />;
+            case 'logs': return <AttendanceLog onAttendanceMarked={fetchDashboardStats} />;
             case 'users': return <ManageUsers user={currentUser} />;
-            case 'settings': return <Settings user={currentUser} />;
+            case 'settings': return <Settings user={currentUser} onUpdateUser={handleUpdateUser} />;
             case 'notebook': return <Notebook />;
             case 'syllabus': return <SyllabusPage user={currentUser} />;
             case 'applications': return <ApplicationsPage user={currentUser} />;
             case 'sbtet': return <SbtetResultsPage user={currentUser} />;
             case 'timetables': return <TimetablePage user={currentUser} />;
             case 'feedback': return <FeedbackPage user={currentUser} />;
-            default: return <Dashboard setCurrentPage={handlePageChange} />;
+            case 'reminders': return <RemindersPage user={currentUser} />;
+            case 'requests': return <RequestsPage user={currentUser} />;
+            case 'qr-scanner': return <QRScannerPage setCurrentPage={handlePageChange} />;
+            default: return <Dashboard setCurrentPage={handlePageChange} currentUser={currentUser} stats={dashboardStats} />;
         }
     };
     
@@ -128,29 +164,30 @@ const App: React.FC = () => {
         <div className="relative min-h-screen bg-slate-100 dark:bg-slate-900">
             <Sidebar
                 isOpen={isSidebarOpen}
-                onClose={() => setTheme('light')} // Closing the sidebar means switching to light theme
+                onClose={closeSidebar}
                 currentPage={currentPage}
                 setCurrentPage={handlePageChange}
                 onLogout={handleLogout}
+                currentUser={currentUser}
             />
 
             {isSidebarOpen && (
                 <div
-                    onClick={() => setTheme('light')} // Clicking the overlay also switches to light theme
+                    onClick={closeSidebar}
                     className="fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity md:hidden"
                     aria-hidden="true"
                 ></div>
             )}
             
-            <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:pl-64' : ''}`}>
+            <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:pl-64' : 'md:pl-0'}`}>
                 <Header
-                    toggleTheme={toggleTheme}
+                    onThemeAndSidebarToggle={handleThemeAndSidebarToggle}
                     currentTheme={theme}
                     currentUser={currentUser}
                     facultyList={facultyList}
                     onUserChange={handleUserChange}
                 />
-                <main className="flex-1 p-6">
+                <main className="flex-1 p-4 sm:p-6">
                     <Suspense fallback={<PageLoader />}>
                         {renderPage()}
                     </Suspense>

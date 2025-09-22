@@ -26,15 +26,18 @@ export const generateReportSummary = async (records: AttendanceRecord[]): Promis
     const ai = getAi();
     const model = 'gemini-2.5-flash';
     const prompt = `
-            Analyze the following employee attendance data and provide a concise, insightful summary for a manager. 
-            Focus on trends, potential issues, and positive call-outs.
-            - Identify any employees with consistent tardiness.
-            - Note the overall attendance rate.
-            - Mention any patterns you observe (e.g., certain days having more absences).
-            - Keep the summary professional and to the point.
-            - Do not just list the data, provide actionable insights.
+            Analyze the following student attendance data for a single day and provide a concise, insightful summary for a college principal or head of department.
+            The data represents attendance for one specific branch/department on one day.
 
-            Data:
+            Focus on the following key areas:
+            - Calculate and state the overall attendance percentage for the day.
+            - Highlight any students who were marked as 'Late'.
+            - Call out any positive observations (e.g., perfect attendance).
+            - Identify potential issues if a significant number of students are absent.
+            - Keep the summary professional, using bullet points for clarity.
+            - Do not just list raw data; provide actionable insights.
+
+            Attendance Data:
             ${JSON.stringify(records, null, 2)}
         `;
 

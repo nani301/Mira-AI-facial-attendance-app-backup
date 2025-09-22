@@ -1,17 +1,18 @@
 
+
 import React, { useState } from 'react';
 import type { User } from '../types';
 import { SunIcon, MoonIcon } from './Icons';
 
 type HeaderProps = {
-    toggleTheme: () => void;
+    onThemeAndSidebarToggle: () => void;
     currentTheme: string;
     currentUser: User | null;
     facultyList: User[];
     onUserChange: (userId: string) => void;
 };
 
-const Header: React.FC<HeaderProps> = ({ toggleTheme, currentTheme, currentUser, facultyList, onUserChange }) => {
+const Header: React.FC<HeaderProps> = ({ onThemeAndSidebarToggle, currentTheme, currentUser, facultyList, onUserChange }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
     const user = currentUser;
@@ -30,21 +31,23 @@ const Header: React.FC<HeaderProps> = ({ toggleTheme, currentTheme, currentUser,
 
     return (
         <header className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Welcome back, {facultyDisplayName}!</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Here's a look at what's happening today.</p>
+            <div className="flex items-center gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Welcome back, {facultyDisplayName}!</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Here's a look at what's happening today.</p>
+                </div>
             </div>
-            <div className="flex items-center space-x-4">
-                 <button onClick={toggleTheme} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+                 <button onClick={onThemeAndSidebarToggle} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                     {currentTheme === 'light' ? <MoonIcon className="w-6 h-6"/> : <SunIcon className="w-6 h-6"/>}
                 </button>
                 <div className="relative">
                     <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center text-right cursor-pointer p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
-                        <div>
+                        <div className="hidden sm:block">
                             <div className="font-semibold text-slate-700 dark:text-slate-200">{user.name}</div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">{user.role}</div>
                         </div>
-                         <div className="w-12 h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xl overflow-hidden ml-4">
+                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xl overflow-hidden ml-2 sm:ml-4">
                             {user.imageUrl ? <img src={user.imageUrl} alt={user.name} className="w-full h-full object-cover" /> : user.name.charAt(0)}
                         </div>
                     </button>
