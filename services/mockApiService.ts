@@ -166,6 +166,16 @@ let users: User[] = [
 const today = new Date();
 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
+const generateMockCoordinate = () => {
+    const COLLEGE_CENTER_LAT = 17.603126;
+    const COLLEGE_CENTER_LNG = 78.085769;
+    const randomLatOffset = (Math.random() - 0.5) * 0.001; // approx +/- 55 meters
+    const randomLngOffset = (Math.random() - 0.5) * 0.001;
+    const coordLat = (COLLEGE_CENTER_LAT + randomLatOffset).toFixed(6);
+    const coordLng = (COLLEGE_CENTER_LNG + randomLngOffset).toFixed(6);
+    return `${coordLat}, ${coordLng}`;
+};
+
 const attendanceRecords: AttendanceRecord[] = [];
 users.filter(u => u.role === Role.STUDENT).forEach(user => {
     // Each student gets a personalized, semi-random attendance probability
@@ -188,6 +198,7 @@ users.filter(u => u.role === Role.STUDENT).forEach(user => {
                 checkInTime: late ? `09:${Math.floor(Math.random()*30)+15}` : `08:${Math.floor(Math.random()*25)+30}`,
                 checkOutTime: `17:${Math.floor(Math.random()*30)}`,
                 status: late ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
+                coordinate: generateMockCoordinate(),
             });
         } else { // Student is absent
              attendanceRecords.push({
@@ -204,6 +215,7 @@ users.filter(u => u.role === Role.FACULTY || u.role === Role.HOD).forEach(facult
             id: `att_${faculty.id}_${formatDate(today)}`,
             userId: faculty.id, userName: faculty.name, userPin: faculty.pin, date: formatDate(today),
             checkInTime: `08:${Math.floor(Math.random()*25)+30}`, checkOutTime: null, status: AttendanceStatus.PRESENT,
+            coordinate: generateMockCoordinate(),
         });
     }
 });

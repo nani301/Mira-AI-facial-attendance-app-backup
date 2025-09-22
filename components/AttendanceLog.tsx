@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { User, AttendanceRecord } from '../types';
@@ -203,42 +200,48 @@ const AttendanceLog: React.FC<AttendanceLogProps> = ({ onAttendanceMarked }) => 
         if (!validatedUser) return;
     
         const simulatedCoords = generateRandomCoordsInRadius(COLLEGE_CENTER_LAT, COLLEGE_CENTER_LNG, CAMPUS_RADIUS_METERS);
-        
-        // Attempt to mark attendance
         const result = await markAttendance(validatedUser.id, { lat: simulatedCoords.latitude, lng: simulatedCoords.longitude });
     
-        // Check the result from the API
         if (result.success) {
-            // On success, set state for the result view
-            const attendanceData = {
+            // Successfully marked for the first time today.
+            setLastAttendance({
                 coords: simulatedCoords,
-                timestamp: new Date() // Use the current, correct timestamp
-            };
-            setLastAttendance(attendanceData);
+                timestamp: new Date()
+            });
             
-            // Send notification email
-            const emailPayload = {
+            // Send email and update dashboard
+            sendEmail({
                 to: validatedUser.email,
                 cc: validatedUser.parent_email,
                 subject: `Attendance Confirmation for ${validatedUser.name}`
-            };
-            await sendEmail(emailPayload);
-            
-            // Trigger dashboard refresh
+            });
             onAttendanceMarked();
-    
-            // Transition to the result step
-            setIsVerifying(false);
-            setIsCameraOpen(false);
-            setStep('result');
         } else {
-            // On failure, show an alert and reset the UI
-            alert((result as { message?: string }).message || "Failed to mark attendance. You may have already checked in today.");
-            setIsVerifying(false);
-            setIsCameraOpen(false);
-            setValidatedUser(null);
-            setPinSelectorKey(Date.now()); // Resets the PinSelector component
+            // Failed to mark, most likely because attendance was already recorded.
+            // We will fetch the existing record and show the result page.
+            const existingRecord = await checkTodaysAttendance(validatedUser.id);
+            if (existingRecord?.checkInTime && existingRecord?.coordinate) {
+                const [lat, lng] = existingRecord.coordinate.split(', ').map(Number);
+                setLastAttendance({
+                    coords: { latitude: lat, longitude: lng },
+                    timestamp: new Date(`${existingRecord.date}T${existingRecord.checkInTime}`)
+                });
+            } else {
+                // This is an unexpected error.
+                alert("An error occurred. The user might be already marked present but their location data is missing, or another issue occurred.");
+                setIsVerifying(false);
+                setIsCameraOpen(false);
+                setValidatedUser(null);
+                setPinSelectorKey(Date.now());
+                return;
+            }
         }
+    
+        // For both cases (newly marked or already marked), transition to the result view.
+        setIsVerifying(false);
+        setIsCameraOpen(false);
+        setStep('result');
+    
     }, [validatedUser, onAttendanceMarked]);
     
     const handleCameraStateChange = useCallback((state: CaptureState, error?: string | null) => {
@@ -255,8 +258,17 @@ const AttendanceLog: React.FC<AttendanceLogProps> = ({ onAttendanceMarked }) => 
         // Pre-verification check: see if the user has already marked attendance today
         const existingRecord = await checkTodaysAttendance(validatedUser.id);
         if (existingRecord && existingRecord.checkInTime) {
-            alert(`Your attendance was already marked today at ${existingRecord.checkInTime}.`);
-            return;
+            // If already marked, go directly to the result view instead of showing an alert.
+            // This assumes that if a checkInTime exists, coordinates will also exist from the markAttendance function.
+            if (existingRecord.coordinate) {
+                const [lat, lng] = existingRecord.coordinate.split(', ').map(Number);
+                const coords = { latitude: lat, longitude: lng };
+                const timestamp = new Date(`${existingRecord.date}T${existingRecord.checkInTime}`);
+                
+                setLastAttendance({ coords, timestamp });
+                setStep('result');
+                return;
+            }
         }
 
         const { timeline } = generateDemoTimeline();
